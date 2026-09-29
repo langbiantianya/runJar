@@ -121,6 +121,21 @@ invocation API, and hands the JAR to that VM.
 - **stdout is made line buffered.** Redirected to a file it would be block
   buffered, and a JAR that prints and then does slow work would appear to print
   nothing at all.
+- **A run works in a directory of its own, under Download.** An app process
+  starts in `/`, which is read-only, so a JAR that writes anything relative — a
+  server its world, a framework a file it generates at startup — fails there;
+  the Ktor sample in this README's own testing fails with `Failed to create
+  OpenAPI output directory: docs`. Every run therefore gets
+  `Download/runJar/<jar name>/`, created on demand and reused from run to run so
+  the data a JAR writes survives being restarted. That directory is the
+  process's working directory before the VM is created — which is what the VM
+  reports as `user.dir`, and so what every relative path resolves against — and
+  it is `user.home` as well, so what a JAR writes for itself lands beside its
+  other files instead of inside the app. `java.io.tmpdir` stays private: scratch
+  files are not the user's.
+  Reaching Download from a path is what "All files access" grants, and the app
+  asks for it when a run starts; a JAR still runs without it, in the app's own
+  directory on the same volume.
 - **`libfreetype.so.6` is renamed to `libfreetype.so`** after unpacking,
   because the guest's libraries reference the unversioned name.
 - **`-Djdk.lang.Process.launchMechanism=FORK`** because `POSIX_SPAWN` needs
@@ -161,6 +176,13 @@ phone itself — loopback, and the phone's own LAN address, which the kernel
 delivers locally — while every connection from another device is dropped
 without a reply, which reads as a firewall rather than a permission. The app
 declares it and asks for it when a run starts, next to `POST_NOTIFICATIONS`.
+
+A run's working directory lives under the Download folder, so "All files access"
+(`MANAGE_EXTERNAL_STORAGE`) is what lets a JAR write where the user can reach
+its files. It is granted in Settings rather than by a dialog, and the app opens
+that screen when a run starts without it. Without the grant a run still works:
+it falls back to the app's own directory on the same volume, and the console
+says which directory it used.
 
 ## Building
 

@@ -2,8 +2,12 @@ package com.kxxnzstdsw.runjar.ui
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -77,12 +81,16 @@ fun RunJarScreen(viewModel: RunViewModel = viewModel()) {
     ) { uri -> uri?.let(viewModel::onJarPicked) }
 
     // Asked for when a run starts, because that is when they matter: the
-    // notification is what the foreground service is shown with, and local
-    // network access is what lets another device reach a JAR that listens. A
-    // refusal only costs the thing refused — the run starts either way.
+    // notification is what the foreground service is shown with, local network
+    // access is what lets another device reach a JAR that listens, and "All
+    // files access" is what lets the run write where the user can find its
+    // files. A refusal only costs the thing refused — the run starts either way.
     val context = LocalContext.current
     val requestRunPermissions = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
+    ) { }
+    val requestAllFilesAccess = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
     ) { }
 
     Scaffold(
@@ -169,6 +177,9 @@ fun RunJarScreen(viewModel: RunViewModel = viewModel()) {
                         onRun = {
                             val missing = missingRunPermissions(context)
                             if (missing.isNotEmpty()) requestRunPermissions.launch(missing)
+                            if (needsAllFilesAccess()) {
+                                requestAllFilesAccess.launch(allFilesAccessSettings(context))
+                            }
                             viewModel.run()
                         },
                         onStop = viewModel::stop,
@@ -219,6 +230,35 @@ private fun missingRunPermissions(context: Context): Array<String> {
     return wanted
         .filter { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
         .toTypedArray()
+}
+
+/**
+ * Whether a run would have to fall back to the app's own directory.
+ *
+ * "All files access" is what lets a run keep its working directory under the
+ * Download folder, where the files it writes are the user's; see
+ * `JvmService.runDirectory`, which falls back when this is false.
+ */
+private fun needsAllFilesAccess(): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()
+
+/**
+ * Where "All files access" is granted.
+ *
+ * It is a switch in Settings rather than a dialog, so this is the screen that
+ * says what the access is for; the per-app screen is preferred, with the list
+ * as a fallback for devices that do not route it.
+ */
+private fun allFilesAccessSettings(context: Context): Intent {
+    val perApp = Intent(
+        Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+        Uri.parse("package:${context.packageName}"),
+    )
+    return if (perApp.resolveActivity(context.packageManager) != null) {
+        perApp
+    } else {
+        Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+    }
 }
 
 @Composable

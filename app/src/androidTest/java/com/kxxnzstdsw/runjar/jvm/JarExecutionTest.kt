@@ -59,6 +59,7 @@ class JarExecutionTest {
 
         val log = File(context.cacheDir, "instrumentation-run.log")
         log.delete()
+        val workDir = runDir("hello")
 
         val outcome = JavaRunner.bootstrap(
             jvmPath = libJvm.absolutePath,
@@ -73,6 +74,7 @@ class JarExecutionTest {
             ),
             appArgs = arrayOf("alpha", "beta"),
             mainClass = mainClass!!,
+            workDir = workDir.absolutePath,
             outPath = log.absolutePath,
         )
         Log.i("JarExecutionTest", "bootstrap returned: $outcome")
@@ -86,6 +88,15 @@ class JarExecutionTest {
             printed.contains("java.version="))
         assertTrue("program arguments were not passed through: '$printed'",
             printed.contains("arg: alpha") && printed.contains("arg: beta"))
+        // A JAR resolves relative paths against this, and an app process starts
+        // in `/`, where writes fail; the run has to be somewhere of its own.
+        // Canonical, because the VM reports the path the kernel resolves —
+        // `/data/data/...` on a device where the app's directory is reached
+        // through a link.
+        assertTrue(
+            "the guest did not work in the directory it was given: '$printed'",
+            printed.contains("user.dir=${workDir.canonicalPath}"),
+        )
     }
 
     @Test
@@ -109,6 +120,7 @@ class JarExecutionTest {
             vmArgs = arrayOf("-Djava.home=${home.absolutePath}", "-Xmx256M"),
             appArgs = emptyArray(),
             mainClass = "does.not.Exist",
+            workDir = runDir("missing").absolutePath,
             outPath = log.absolutePath,
         )
         Log.i("JarExecutionTest", "missing-class outcome: $outcome")
@@ -143,6 +155,7 @@ class JarExecutionTest {
             ),
             appArgs = emptyArray(),
             mainClass = "hello.Boom",
+            workDir = runDir("boom").absolutePath,
             outPath = log.absolutePath,
         )
         Log.i("JarExecutionTest", "throwing-main outcome: $outcome")
@@ -159,6 +172,9 @@ class JarExecutionTest {
         assertTrue("the stack trace was not captured: '$printed'",
             printed.contains("hello.Boom.main"))
     }
+
+    /** A directory of its own for a run, as the service gives every run. */
+    private fun runDir(name: String): File = File(context.cacheDir, "run/$name").apply { mkdirs() }
 
     private fun copyAsset(name: String): File {
         val target = File(context.filesDir, "user-jars/$name")

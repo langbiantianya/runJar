@@ -187,6 +187,28 @@ static const char *redirect_stdio(const char *path) {
 }
 
 /**
+ * Makes [path] the process's working directory.
+ *
+ * A JAR that touches the filesystem resolves relative paths there, and the VM
+ * reports it as `user.dir` — the property `java.io` resolves against — from the
+ * directory the process was in when the VM was created. An app process starts
+ * in `/`, which is read-only, so a JAR that writes anything relative — a server
+ * its world, a framework a generated file — fails with a permission error
+ * unless the run is given somewhere of its own to be.
+ *
+ * The caller is expected to have created [path]; failing to enter it is
+ * reported rather than fatal, since a run whose JAR touches nothing still
+ * works.
+ *
+ * @return null on success, otherwise a short reason.
+ */
+static const char *enter_working_directory(const char *path) {
+    if (path[0] == '\0') return NULL;
+    if (chdir(path) != 0) return "cannot enter the run directory";
+    return NULL;
+}
+
+/**
  * Hands HotSpot a clean signal slate.
  *
  * It installs its own crash and polling handlers only for signals it finds
@@ -468,13 +490,16 @@ Java_com_kxxnzstdsw_runjar_jvm_JavaRunner_nativeBootstrap(JNIEnv *env, jclass cl
                                                           jobjectArray vm_args,
                                                           jobjectArray app_args,
                                                           jstring main_class,
+                                                          jstring work_dir,
                                                           jstring out_path) {
     (void) clazz;
     char home[PATH_MAX];
     char native_dir[PATH_MAX];
+    char run_dir[PATH_MAX];
     char out_file[PATH_MAX];
     read_jstring(env, java_home, home, sizeof(home));
     read_jstring(env, native_lib_dir, native_dir, sizeof(native_dir));
+    read_jstring(env, work_dir, run_dir, sizeof(run_dir));
     read_jstring(env, out_path, out_file, sizeof(out_file));
 
     pthread_mutex_lock(&g_state.lock);
@@ -491,6 +516,12 @@ Java_com_kxxnzstdsw_runjar_jvm_JavaRunner_nativeBootstrap(JNIEnv *env, jclass cl
     }
 
     if (g_state.vm == NULL) {
+        // Done before the VM exists: HotSpot reads the working directory when
+        // it builds `user.dir`, and every relative path the JAR uses resolves
+        // against that property for the life of the VM.
+        const char *dir_error = enter_working_directory(run_dir);
+        if (dir_error != NULL) LOGW("%s: %s", dir_error, run_dir);
+
         char err[PATH_MAX];
         g_state.vm = create_vm(env, jvm_path, home, ld_path, vm_args, err, sizeof(err));
         if (g_state.vm == NULL) {

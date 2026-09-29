@@ -15,7 +15,9 @@ object JavaRunner {
      * Everything the guest writes to stdout/stderr is redirected to [outPath]
      * (appending) before the VM is touched, so the caller can tail the file.
      * [nativeLibDir] is the app's own native library directory, which goes on
-     * the guest's linker search path alongside the runtime's.
+     * the guest's linker search path alongside the runtime's. [workDir] becomes
+     * the process's working directory — and so the VM's `user.dir`, which is
+     * what relative paths in the JAR resolve against — and must already exist.
      *
      * @return `OK` when main returned normally, otherwise `ERROR <message>`.
      */
@@ -26,9 +28,10 @@ object JavaRunner {
         vmArgs: Array<String>,
         appArgs: Array<String>,
         mainClass: String,
+        workDir: String,
         outPath: String,
     ): String = nativeBootstrap(
-        jvmPath, javaHome, nativeLibDir, vmArgs, appArgs, mainClass, outPath,
+        jvmPath, javaHome, nativeLibDir, vmArgs, appArgs, mainClass, workDir, outPath,
     )
 
     private external fun nativeBootstrap(
@@ -38,6 +41,7 @@ object JavaRunner {
         vmArgs: Array<String>,
         appArgs: Array<String>,
         mainClass: String,
+        workDir: String,
         outPath: String,
     ): String
 }

@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -242,7 +243,14 @@ class JvmService : Service() {
                 val home = installer.ensureInstalled(release)
                 Log.i(TAG, "runtime $home ready, launching $mainClass")
 
+                val runDir = runDirectory(jar)
+                Log.i(TAG, "working directory: $runDir")
                 log.parentFile?.mkdirs()
+                // Said in the console, not just in logcat: a JAR that writes
+                // files is the reason the run has a directory of its own, and
+                // the user has to know where those files went.
+                log.appendText("=== running in ${runDir.absolutePath} ===\n")
+
                 // From here on the process holds a VM. OpenJDK builds one per
                 // process and cannot undo it, so this is what Stop acts on and
                 // what the next UI asks about, whether or not `main` returns.
@@ -251,9 +259,10 @@ class JvmService : Service() {
                     jvmPath = installer.libJvm(release).absolutePath,
                     javaHome = home.absolutePath,
                     nativeLibDir = applicationInfo.nativeLibraryDir,
-                    vmArgs = buildVmArgs(home, jar, heapMb),
+                    vmArgs = buildVmArgs(home, jar, runDir, heapMb),
                     appArgs = args,
                     mainClass = mainClass,
+                    workDir = runDir.absolutePath,
                     outPath = log.absolutePath,
                 )
                 when {
@@ -310,12 +319,50 @@ class JvmService : Service() {
         )
     }
 
-    private fun buildVmArgs(home: File, jar: File, heapMb: Int): Array<String> = arrayOf(
+    /**
+     * The directory a run's JAR works in.
+     *
+     * An app process starts in `/`, which is read-only: a JAR that writes
+     * anything relative to its working directory — a server its world, a
+     * framework a generated file — fails there, and one that writes to `~`
+     * lands somewhere the user cannot see. So each JAR gets a directory named
+     * after it under the Download folder, where the files it writes are
+     * ordinary files the user can move, edit and delete.
+     *
+     * The directory is the same from run to run, which is the point: a server's
+     * data has to survive being restarted.
+     *
+     * Writing under Download needs "All files access" — the UI asks for it when
+     * a run starts. Without it the app's own directory on the same volume is
+     * used instead: no permission is needed for it, it is the user's over USB,
+     * and a JAR still runs rather than failing for want of a directory.
+     */
+    private fun runDirectory(jar: File): File {
+        val name = jar.nameWithoutExtension
+        // Deprecated in favour of MediaStore, which a guest JVM cannot use: it
+        // wants a path, not a content URI.
+        @Suppress("DEPRECATION")
+        val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val candidates = listOfNotNull(
+            File(downloads, "runJar/$name"),
+            getExternalFilesDir(null)?.let { File(it, "run/$name") },
+            File(filesDir, "run/$name"),
+        )
+        val chosen = candidates.firstOrNull { it.isDirectory || it.mkdirs() }
+        if (chosen == null) Log.w(TAG, "no usable run directory for ${jar.name}")
+        return chosen ?: filesDir
+    }
+
+    private fun buildVmArgs(home: File, jar: File, runDir: File, heapMb: Int): Array<String> = arrayOf(
         "-Djava.home=${home.absolutePath}",
         "-Djava.class.path=${JarManifest.classPathOf(jar)}",
         "-Djava.library.path=${home.absolutePath}/lib",
         "-Djava.io.tmpdir=${cacheDir.absolutePath}",
-        "-Duser.home=${filesDir.absolutePath}",
+        // `~` is the run's directory too, so everything a JAR writes for itself
+        // — its data, its caches — lands in the one place the user can reach.
+        // The temp directory stays private: it is scratch by definition, and
+        // Download is not the place for it.
+        "-Duser.home=${runDir.absolutePath}",
         "-Dfile.encoding=UTF-8",
         // The guest has no X11 and no window manager, so AWT must not try to
         // reach a display even for a JAR that never opens a window.
