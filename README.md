@@ -289,6 +289,42 @@ USB. Download itself is deliberately not used — reaching it by path requires
 "All files access" (`MANAGE_EXTERNAL_STORAGE`), a restricted permission that a
 published app which is neither a file manager nor a backup tool cannot hold.
 
+## Licence
+
+runJar is free software under the GNU General Public License, version 3 or any
+later version: the text is in `LICENSE`, and this repository is the source.
+Anyone passing the APK on has to pass the licence and access to that source with
+it — which is why the sample JAR's own sources are in the tree and not only its
+compiled form.
+
+That GPLv3 can be used here at all is worth spelling out, because the app boots a
+GPLv2 runtime:
+
+- **The guest runtime is not distributed with the app.** `JreInstaller` downloads
+  OpenJDK — GPLv2 only, with the Classpath Exception — from MojoLauncher's release
+  onto the device at first use. None of it is in the APK, so the app distributes
+  none of it, and the licence a user takes on with that download is with the
+  runtime itself.
+- **The Classpath Exception is what makes calling into it lawful.** It exists so
+  that linking a module against the OpenJDK library does not put that module under
+  the GPL; an app under any licence can `dlopen()` `libjvm.so` and start a VM in
+  it on those terms.
+- **Everything linked into the APK is compatible.** androidx and Jetpack Compose,
+  the Kotlin standard library and kotlinx.coroutines are Apache-2.0 — which the
+  FSF lists as compatible with GPLv3 — and `org.tukaani:xz` is public domain.
+  Nothing the APK contains is under a licence the GPLv3 cannot sit with.
+- **What GPLv2-only and GPLv3 cannot do is form one work together**, so the runtime
+  has to stay the separately fetched artifact it already is. Bundling it into the
+  APK would be the one change that raises a question this arrangement avoids.
+
+"Version 3 or any later version" is the FSF's own recommendation in the licence's
+closing *How to Apply These Terms* section, and it keeps the app usable under
+future versions of the GPL. Pinning it to version 3 alone is a change of those
+words and nothing else.
+
+Third-party components keep their own licences whatever this one says: the About
+screen lists them, and the guest runtime stays OpenJDK's.
+
 ## Building
 
 ```bash
@@ -337,6 +373,19 @@ network access:
 
 Both suites pass on a real arm64 device running Android 17: 14 unit tests and
 6 instrumentation tests, none skipped.
+
+The sample JAR the app ships as `assets/hello.jar` — and that both instrumentation
+tests run — is built from the sources in `sample/hello/`. `Hello` prints what the
+VM it landed in turned out to be, `Boom` throws, `Exiter` calls `System.exit(3)`,
+and `Server` claims the VM's one URL stream handler factory and leaves a
+non-daemon thread behind, which is what makes a run whose `main` has returned
+still hold its process. They are the sources that built it rather than a
+paraphrase of it: `javac --release 17` on them yields class files byte-identical
+to the four in the JAR, and `jar --create --file hello.jar --main-class
+hello.Hello -C <classes> .` produces the same entries with the same manifest.
+They carry no comment or licence header for that reason — a line added above the
+code moves its line numbers, and the line numbers are part of what the committed
+classes record — and `LICENSE` covers them as it covers everything else here.
 
 The bridge itself has no unit-testable surface off-device: it dlopens an
 Android-built `libjvm.so`, which links against Bionic and cannot load on a
