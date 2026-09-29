@@ -53,10 +53,27 @@
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.RunJar">
+        <!--
+          Portrait, and it stays portrait. The run screen is one column — a form
+          above the console — and the console keeps a floor of its own height
+          whatever the window does; a turn to landscape makes that column wider
+          than it is tall, so the console takes the height and the form is
+          pushed out of the window it was meant to share. The two screens below
+          are locked with this one, so backing out of them is not a turn either.
+
+          On a large screen this is a request the platform need not honour:
+          since Android 16 (API 36) a device with the ignore-orientation display
+          setting treats screenOrientation as a hint, and the manifest property
+          that opts an app back in (PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY)
+          is ignored at targetSdk 37, which this app targets. On a phone the lock
+          is what the platform does; on a tablet or a foldable the platform
+          decides.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.RunJar"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -78,11 +95,13 @@
         <activity
             android:name=".PermissionGuideActivity"
             android:exported="false"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.RunJar" />
 
         <activity
             android:name=".AboutActivity"
             android:exported="false"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.RunJar" />
 
         <!--
