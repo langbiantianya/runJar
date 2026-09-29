@@ -5,6 +5,16 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!--
+      A JAR that listens is a server, and the point of serving is that other
+      devices reach it. Since Android 17 (API 37) the platform gates an app's
+      local-network traffic behind this runtime permission: without it,
+      connections from another device are dropped while the phone's own
+      connections — loopback, and its own LAN address, which the kernel delivers
+      locally — keep working. A guest then looks alive to the phone and is
+      unreachable to everything else. See the request made when a run starts.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+    <!--
       A JAR that serves requests has to keep serving after the user leaves the
       app, and Android freezes a process that is merely backgrounded. Hosting the
       guest in a foreground service is what stops that.

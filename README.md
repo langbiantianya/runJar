@@ -154,6 +154,14 @@ A JAR's own manifest permissions are **not** merged into the APK. Anything the
 JAR needs — network, storage — must be declared by the app, and requested at
 runtime on Android 6.0+.
 
+A JAR that serves other devices needs `ACCESS_LOCAL_NETWORK` on Android 17
+(API 37) and up, where the platform gates an app's local-network traffic behind
+that runtime permission. Without it the guest binds its port and answers the
+phone itself — loopback, and the phone's own LAN address, which the kernel
+delivers locally — while every connection from another device is dropped
+without a reply, which reads as a firewall rather than a permission. The app
+declares it and asks for it when a run starts, next to `POST_NOTIFICATIONS`.
+
 ## Building
 
 ```bash

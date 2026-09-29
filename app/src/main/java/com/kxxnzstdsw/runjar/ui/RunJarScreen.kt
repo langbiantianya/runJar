@@ -1,6 +1,7 @@
 package com.kxxnzstdsw.runjar.ui
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -75,12 +76,13 @@ fun RunJarScreen(viewModel: RunViewModel = viewModel()) {
         ActivityResultContracts.OpenDocument(),
     ) { uri -> uri?.let(viewModel::onJarPicked) }
 
-    // Asked for when a run starts, because that is when the notification becomes
-    // relevant. A refusal only hides the notification: the guest is still hosted
-    // by a foreground service, which is what keeps it unfrozen.
+    // Asked for when a run starts, because that is when they matter: the
+    // notification is what the foreground service is shown with, and local
+    // network access is what lets another device reach a JAR that listens. A
+    // refusal only costs the thing refused — the run starts either way.
     val context = LocalContext.current
-    val requestNotifications = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
+    val requestRunPermissions = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
     ) { }
 
     Scaffold(
@@ -165,14 +167,8 @@ fun RunJarScreen(viewModel: RunViewModel = viewModel()) {
                         // whose main returned keeps running until it is stopped.
                         guestAlive = state.guestRunning,
                         onRun = {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                ContextCompat.checkSelfPermission(
-                                    context,
-                                    Manifest.permission.POST_NOTIFICATIONS,
-                                ) != PackageManager.PERMISSION_GRANTED
-                            ) {
-                                requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            }
+                            val missing = missingRunPermissions(context)
+                            if (missing.isNotEmpty()) requestRunPermissions.launch(missing)
                             viewModel.run()
                         },
                         onStop = viewModel::stop,
@@ -200,6 +196,30 @@ fun RunJarScreen(viewModel: RunViewModel = viewModel()) {
  * line pinned above it.
  */
 private val CONSOLE_FLOOR = 240.dp
+
+/**
+ * The permissions a run needs that the user has not granted yet.
+ *
+ * `POST_NOTIFICATIONS` shows the foreground service's notification. From
+ * Android 17 (API 37) the platform also gates an app's local-network traffic:
+ * without `ACCESS_LOCAL_NETWORK`, connections from another device are dropped
+ * while the phone's own — loopback, and its own LAN address, which the kernel
+ * delivers locally — keep working, so a JAR that serves looks fine from the
+ * phone and is unreachable to the rest of the network.
+ */
+private fun missingRunPermissions(context: Context): Array<String> {
+    val wanted = buildList {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN) {
+            add(Manifest.permission.ACCESS_LOCAL_NETWORK)
+        }
+    }
+    return wanted
+        .filter { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
+        .toTypedArray()
+}
 
 @Composable
 private fun JarSelector(jarName: String?, onPick: () -> Unit, onUseSample: () -> Unit) {
