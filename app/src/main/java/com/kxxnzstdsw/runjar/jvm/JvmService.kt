@@ -76,7 +76,7 @@ class JvmService : Service() {
             getString(R.string.app_name),
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = "Shown while a JAR is running"
+            description = getString(R.string.notification_channel_description)
             setShowBadge(false)
         }
         getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
@@ -199,7 +199,7 @@ class JvmService : Service() {
      */
     private fun handleStop() {
         if (guestHosted.get()) {
-            notifyRunFinished(JvmProtocol.STATUS_ERROR, "Stopped")
+            notifyRunFinished(JvmProtocol.STATUS_ERROR, getString(R.string.outcome_stopped))
         } else {
             Log.i(TAG, "stop requested with no guest in this process")
         }
@@ -248,7 +248,9 @@ class JvmService : Service() {
                 // Said in the console, not just in logcat: a JAR that writes
                 // files is the reason the run has a directory of its own, and
                 // the user has to know where those files went.
-                log.appendText("=== running in ${runDir.absolutePath} ===\n")
+                log.appendText(
+                    getString(R.string.console_run_directory, runDir.absolutePath) + "\n",
+                )
 
                 // From here on the process holds a VM. OpenJDK builds one per
                 // process and cannot undo it, so this is what Stop acts on and
@@ -277,7 +279,7 @@ class JvmService : Service() {
                         Log.i(TAG, "main returned, the guest is still running")
                         notifyRunFinished(
                             outcome,
-                            "Main returned. The JVM is still running — press Stop to shut it down",
+                            getString(R.string.outcome_main_returned),
                         )
                         // It is still serving, so it stays a foreground service
                         // and stays started: the app may be swiped away next.
@@ -286,7 +288,7 @@ class JvmService : Service() {
 
                     else -> {
                         Log.i(TAG, "run completed")
-                        notifyRunFinished(JvmProtocol.STATUS_OK, "The JAR finished")
+                        notifyRunFinished(JvmProtocol.STATUS_OK, getString(R.string.outcome_jar_finished))
                         terminateGuestProcess()
                     }
                 }

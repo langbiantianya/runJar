@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The app's text, in English, as the default resources — the fallback every
+  device that matches no locale folder reads. Every key that is not marked
+  translatable="false" is therefore required in every folder under
+  values-<locale>/, and TranslationsTest holds them to that: a missing key is
+  not a crash, it is a screen that silently drops back to English.
+
+  A format specifier is part of the key's contract, not of the sentence: the
+  positional arguments (%1$s, %2$d), the escaped literal percent (%%) and the
+  XML escapes (\' for an apostrophe, \" around a quoted word) are identical in
+  every translation, and the test compares them.
+-->
+<resources>
+    <!-- The app's own name: a proper noun, the same in every language. -->
+
+    <!-- The run screen: the top bar, the form, and the status line. -->
+    <string name="title_run">Запуск JAR</string>
+    <string name="title_about">О приложении</string>
+    <string name="title_permissions">Разрешения</string>
+    <string name="jar_none">JAR не выбран</string>
+    <string name="jar_choose">Выбрать файл</string>
+    <string name="jar_sample">Пример JAR</string>
+    <string name="runtime_label">Гостевая среда выполнения</string>
+    <!-- %1$s is the runtime's label, for example "Java 21". -->
+    <string name="runtime_installed">%1$s (установлена)</string>
+    <!-- %1$d is the heap size in mebibytes. -->
+    <string name="heap_label">Гостевая куча: %1$d МБ</string>
+    <string name="main_class_label">Главный класс</string>
+    <string name="args_label">Аргументы</string>
+    <string name="action_run">Запустить</string>
+    <string name="action_running">Выполняется…</string>
+    <string name="action_stop">Остановить</string>
+    <!-- %1$d is the download's percentage, and %% is a literal percent sign. -->
+    <string name="status_fetching">Загрузка Java %1$d%%</string>
+    <string name="console_title">Консоль</string>
+    <string name="console_clear">Очистить</string>
+    <string name="console_empty">Здесь отображается вывод main() из JAR.</string>
+
+    <!-- What the run says in the console, and how it ends. -->
+    <!-- %1$s is the JAR's file name. -->
+    <string name="console_selected">Выбран %1$s</string>
+    <!-- %1$s is the file name, %2$s the main class read from its manifest. -->
+    <string name="console_sample_loaded">Загружен %1$s с главным классом %2$s</string>
+    <!-- %1$s is the directory the JAR runs in. -->
+    <string name="console_run_directory">=== выполнение в %1$s ===</string>
+    <string name="error_read_selected_file">Не удалось прочитать выбранный файл</string>
+    <string name="error_sample_jar">Не удалось загрузить пример JAR</string>
+    <string name="error_choose_jar">Сначала выберите JAR</string>
+    <string name="error_main_class_required">Введите главный класс</string>
+    <!-- %1$s is the failure's message. -->
+    <string name="error_runtime_install">Не удалось установить среду выполнения: %1$s</string>
+    <string name="outcome_run_finished">Запуск завершён</string>
+    <string name="outcome_guest_ended">Гостевая JVM завершилась — см. консоль</string>
+    <string name="outcome_adopted_guest">Гостевая JVM всё ещё выполняется — нажмите «Остановить», чтобы её завершить</string>
+    <string name="outcome_stopped">Остановлено</string>
+    <string name="outcome_main_returned">Метод main() завершился. JVM всё ещё выполняется — нажмите «Остановить», чтобы её завершить</string>
+    <string name="outcome_jar_finished">JAR завершился</string>
+
+    <!-- The ongoing notification for a run. -->
+    <!-- %1$s is the JAR's file name. -->
+    <string name="notification_running">Выполняется %1$s</string>
+    <string name="notification_running_detail">Java-приложение выполняется</string>
+    <string name="notification_channel_description">Отображается, пока выполняется JAR</string>
+
+    <!-- The permission guide. -->
+    <string name="permission_guide_intro">runJar загружает среду выполнения Java и запускает её внутри этого приложения, поэтому JAR выполняется с разрешениями этого приложения — собственные разрешения JAR из его манифеста не объединяются с APK. Ниже перечислено всё, что объявляет приложение, и то, что оно с этим делает.</string>
+    <string name="permission_guide_closing">Оба разрешения, запрашиваемые во время выполнения, приложение запрашивает при запуске. Отказ от одного из них лишает только того, для чего оно предназначено: JAR, который никогда не принимает подключения от других устройств, разницы не заметит.</string>
+    <string name="action_grant_now">Предоставить</string>
+    <string name="action_continue">Продолжить</string>
+    <string name="permission_state_install_time">Предоставлено при установке</string>
+    <string name="permission_state_not_on_version">Не требуется в этой версии</string>
+    <string name="permission_state_granted">Предоставлено</string>
+    <string name="permission_state_denied">Не предоставлено</string>
+
+    <string name="permission_internet_label">Доступ к сети</string>
+    <string name="permission_internet_purpose">Загружает гостевую среду выполнения при первом запуске JAR — jre&lt;version&gt;-pojav.zip, около 100 МБ — и обслуживает собственные сокеты запуска: обращение к API, загрузку URL, прослушивание порта. Трафик JAR — это трафик приложения, поэтому без этого он вообще не смог бы подключиться.</string>
+    <string name="permission_local_network_label">Локальная сеть</string>
+    <string name="permission_local_network_purpose">Позволяет другим устройствам подключаться к JAR, который принимает подключения. Начиная с Android 17 платформа сбрасывает их соединения без этого разрешения, тогда как собственные подключения телефона — петлевой интерфейс и его собственный адрес в сети — продолжают работать, поэтому JAR, который обслуживает запросы, на телефоне выглядит исправным и недоступен откуда-либо ещё. Запрашивается при запуске.</string>
+    <string name="permission_foreground_service_label">Поддерживать выполнение</string>
+    <string name="permission_foreground_service_purpose">Размещает гостевую JVM в службе переднего плана. Android замораживает процесс, который просто находится в фоне: его прослушивающие сокеты остаются открытыми, но никто не принимает по ним подключения, поэтому JAR, который обслуживает запросы, перестал бы отвечать, как только приложение будет свёрнуто.</string>
+    <string name="permission_foreground_service_type_label">Поддерживать выполнение: объявленный тип</string>
+    <string name="permission_foreground_service_type_purpose">Тип службы переднего плана, который приложение обязано указать для такой работы — запуска программы, предоставленной пользователем. Манифест объявляет его со свойством подтипа, которое говорит именно об этом.</string>
+    <string name="permission_notifications_label">Уведомления</string>
+    <string name="permission_notifications_purpose">Показывает постоянное уведомление о запуске: какой JAR выполняется, и действие «Остановить», которое завершает его без повторного открытия приложения. Отказ скрывает только это уведомление и ничего больше — на запуск это не влияет.</string>
+
+    <!-- About: what the app does, how it does it, and what it is built from. -->
+    <string name="about_section_purpose">Что он делает</string>
+    <string name="about_purpose_body">Запускает произвольный Java JAR на Android без изменений. Собственная среда выполнения Android — это ART, которая исполняет байт-код DEX и не может запустить стандартный JAR, поэтому приложение не пытается этого от неё добиться: оно запускает внутри приложения полноценную виртуальную машину OpenJDK и передаёт JAR ей.</string>
+    <string name="about_section_method">Как это работает</string>
+    <string name="about_method_runtime">Гостевая среда выполнения загружается один раз в собственное хранилище приложения — около 100 МБ — и распаковывается там. Исполняемые файлы нельзя запускать из общего хранилища, а библиотеки гостя всё равно загружаются по абсолютному пути.</string>
+    <string name="about_method_bridge">Небольшой нативный мост делает библиотеки этой среды выполнения доступными, а затем вызывает dlopen() для libjvm.so из неё. Поднимающаяся виртуальная машина не зависит от ART: её классы принадлежат самой среде выполнения и находятся под её собственным загрузчиком классов.</string>
+    <string name="about_method_service">Гость выполняется в отдельном процессе (процесс \":jvm\") как служба переднего плана, поэтому JAR, который обслуживает запросы, продолжает их обслуживать после выхода из приложения, а сбой в госте обрушивает только этот процесс — не экран.</string>
+    <string name="about_method_process">JVM допускает одну виртуальную машину на процесс, а её завершение здесь ничего не делает, поэтому переиспользуется именно процесс: каждый запуск создаёт новый, и то же самое `java -jar` даёт при каждом вызове.</string>
+    <string name="about_method_console">Всё, что печатает JAR, перенаправляется в один поток и отображается в консоли, а рабочим каталогом служит собственный каталог запуска — внутри хранилища приложения, поэтому разрешение на доступ к хранилищу не требуется.</string>
+    <string name="about_section_credits">Благодарности</string>
+    <string name="about_credits_body">Способ получения среды выполнения и рецепт её запуска на устройстве взяты из MojoLauncher: его rolling-релиз публикует архивы среды выполнения, а исправления для Android, которые позволяют их запускать, — результат работы его портов, а до них — PojavLauncher. Путь поиска компоновщика, предварительная загрузка библиотек, переименование freetype и средство чтения архивов xz — всё это их.</string>
+    <string name="about_credits_runtime_body">Среда выполнения внутри этих архивов — OpenJDK, собранная для Android из порта OpenJDK Mobile. Репозиторий, который их собирает, не объявляет собственной лицензии; упакованная в нём среда выполнения Java принадлежит OpenJDK.</string>
+    <string name="about_section_licences">Компоненты и лицензии</string>
+    <string name="about_licences_note">OpenJDK — это гостевая среда выполнения, загружаемая при первом запуске, а не поставляемая в составе приложения. Остальная часть classpath — транзитивное замыкание остальных строк: модулей AndroidX, JSpecify и пустой заглушки ListenableFuture из Guava — и распространяется под Apache-2.0.</string>
+    <!-- Licence names. The identifiers stay as they are; the plain-English one does not. -->
+    <string name="licence_public_domain">Общественное достояние</string>
+</resources>

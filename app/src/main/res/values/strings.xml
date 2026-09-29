@@ -1,6 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The app's text, in English, as the default resources — the fallback every
+  device that matches no locale folder reads. Every key that is not marked
+  translatable="false" is therefore required in every folder under
+  values-<locale>/, and TranslationsTest holds them to that: a missing key is
+  not a crash, it is a screen that silently drops back to English.
+
+  A format specifier is part of the key's contract, not of the sentence: the
+  positional arguments (%1$s, %2$d), the escaped literal percent (%%) and the
+  XML escapes (\' for an apostrophe, \" around a quoted word) are identical in
+  every translation, and the test compares them.
+-->
 <resources>
-    <string name="app_name">runJar</string>
+    <!-- The app's own name: a proper noun, the same in every language. -->
+    <string name="app_name" translatable="false">runJar</string>
+
+    <!-- The run screen: the top bar, the form, and the status line. -->
+    <string name="title_run">Run JAR</string>
+    <string name="title_about">About</string>
+    <string name="title_permissions">Permissions</string>
+    <string name="jar_none">No JAR selected</string>
+    <string name="jar_choose">Choose file</string>
+    <string name="jar_sample">Sample JAR</string>
+    <string name="runtime_label">Guest runtime</string>
+    <!-- %1$s is the runtime's label, for example "Java 21". -->
+    <string name="runtime_installed">%1$s (installed)</string>
+    <!-- %1$d is the heap size in mebibytes. -->
+    <string name="heap_label">Guest heap: %1$d MB</string>
+    <string name="main_class_label">Main class</string>
+    <string name="args_label">Arguments</string>
+    <string name="action_run">Run</string>
+    <string name="action_running">Running…</string>
+    <string name="action_stop">Stop</string>
+    <!-- %1$d is the download's percentage, and %% is a literal percent sign. -->
+    <string name="status_fetching">Fetching Java %1$d%%</string>
+    <string name="console_title">Console</string>
+    <string name="console_clear">Clear</string>
+    <string name="console_empty">Output from the JAR\'s main() appears here.</string>
+
+    <!-- What the run says in the console, and how it ends. -->
+    <!-- %1$s is the JAR's file name. -->
+    <string name="console_selected">Selected %1$s</string>
+    <!-- %1$s is the file name, %2$s the main class read from its manifest. -->
+    <string name="console_sample_loaded">Loaded %1$s with main class %2$s</string>
+    <!-- %1$s is the directory the JAR runs in. -->
+    <string name="console_run_directory">=== running in %1$s ===</string>
+    <string name="error_read_selected_file">Could not read the selected file</string>
+    <string name="error_sample_jar">Could not load the sample JAR</string>
+    <string name="error_choose_jar">Choose a JAR first</string>
+    <string name="error_main_class_required">Enter a main class</string>
+    <!-- %1$s is the failure's message. -->
+    <string name="error_runtime_install">Runtime install failed: %1$s</string>
+    <string name="outcome_run_finished">Run finished</string>
+    <string name="outcome_guest_ended">The guest JVM ended — see the console</string>
+    <string name="outcome_adopted_guest">A guest JVM is still running — press Stop to shut it down</string>
+    <string name="outcome_stopped">Stopped</string>
+    <string name="outcome_main_returned">Main returned. The JVM is still running — press Stop to shut it down</string>
+    <string name="outcome_jar_finished">The JAR finished</string>
+
+    <!-- The ongoing notification for a run. -->
+    <!-- %1$s is the JAR's file name. -->
     <string name="notification_running">Running %1$s</string>
     <string name="notification_running_detail">The Java application is running</string>
-    <string name="action_stop">Stop</string>
+    <string name="notification_channel_description">Shown while a JAR is running</string>
+
+    <!-- The permission guide. -->
+    <string name="permission_guide_intro">runJar downloads a Java runtime and starts it inside this app, so the JAR runs under this app\'s permissions — a JAR\'s own manifest permissions are not merged into the APK. Everything the app declares is below, with what it does with it.</string>
+    <string name="permission_guide_closing">The two runtime permissions are asked for when a run starts. Declining one costs only what it is for: a JAR that never listens for other devices never notices the difference.</string>
+    <string name="action_grant_now">Grant now</string>
+    <string name="action_continue">Continue</string>
+    <string name="permission_state_install_time">Granted at install</string>
+    <string name="permission_state_not_on_version">Not required on this version</string>
+    <string name="permission_state_granted">Granted</string>
+    <string name="permission_state_denied">Not granted</string>
+
+    <string name="permission_internet_label">Network access</string>
+    <string name="permission_internet_purpose">Downloads the guest runtime the first time a JAR is run — jre&lt;version&gt;-pojav.zip, about 100 MB — and carries the run\'s own sockets: calling an API, fetching a URL, listening on a port. The JAR\'s traffic is the app\'s traffic, so without this it could not connect at all.</string>
+    <string name="permission_local_network_label">Local network</string>
+    <string name="permission_local_network_purpose">Lets other devices reach a JAR that listens. From Android 17 the platform drops their connections without it, while the phone\'s own — loopback, and its own address on the network — keep working, so a JAR that serves looks fine on the phone and is unreachable from anywhere else. Asked for when a run starts.</string>
+    <string name="permission_foreground_service_label">Keep a run going</string>
+    <string name="permission_foreground_service_purpose">Hosts the guest JVM in a foreground service. Android freezes a process that is merely in the background: its listening sockets stay open but nothing accepts on them, so a JAR that serves would stop answering the moment the app is left.</string>
+    <string name="permission_foreground_service_type_label">Keep a run going: declared type</string>
+    <string name="permission_foreground_service_type_purpose">The foreground service type an app has to name for this kind of work — running a program the user supplied. The manifest declares it with the subtype property that says exactly that.</string>
+    <string name="permission_notifications_label">Notifications</string>
+    <string name="permission_notifications_purpose">Shows the ongoing notification for a run: which JAR is up, and a Stop action that ends it without reopening the app. Declining hides that notification and nothing else — the run is unaffected.</string>
+
+    <!-- About: what the app does, how it does it, and what it is built from. -->
+    <string name="about_section_purpose">What it does</string>
+    <string name="about_purpose_body">Runs an arbitrary Java JAR on Android, unmodified. Android\'s own runtime is ART, which executes DEX bytecode and cannot run a standard JAR, so this app does not try to make it: it starts a complete OpenJDK virtual machine inside the app and hands the JAR to that VM.</string>
+    <string name="about_section_method">How it works</string>
+    <string name="about_method_runtime">The guest runtime is fetched once into the app\'s own storage — about 100 MB — and unpacked there. Binaries cannot be executed from shared storage, and the guest\'s libraries are loaded by absolute path anyway.</string>
+    <string name="about_method_bridge">A small native bridge makes that runtime\'s libraries reachable, then dlopen()s libjvm.so from it. The VM that comes up is independent of ART: its classes are the runtime\'s own, under its own class loader.</string>
+    <string name="about_method_service">The guest runs in a process of its own (the \":jvm\" process) as a foreground service, so a JAR that serves keeps serving after you leave the app, and a fault in the guest takes down only that process — not the screen.</string>
+    <string name="about_method_process">A JVM allows one VM per process and its shutdown is a no-op here, so the process is what gets reused: every run starts a fresh one, which is what `java -jar` gives each invocation too.</string>
+    <string name="about_method_console">Everything the JAR prints is redirected into one stream and shown in the console, with the run\'s own directory as its working directory — inside the app\'s storage, so nothing needs a storage permission.</string>
+    <string name="about_section_credits">Credits</string>
+    <string name="about_credits_body">Runtime acquisition and the on-device startup recipe came from MojoLauncher: its rolling release publishes the runtime archives, and the Android fixes that make them start are the ones its ports — and PojavLauncher\'s before them — worked out. The linker search path, the library preload, the freetype rename and the reader for the xz archives are all theirs.</string>
+    <string name="about_credits_runtime_body">The runtime inside those archives is OpenJDK, built for Android from the OpenJDK Mobile port. The repository that builds them declares no licence of its own; the Java runtime it packages is OpenJDK\'s.</string>
+    <string name="about_section_licences">Components and licences</string>
+    <string name="about_licences_note">OpenJDK is the guest runtime, fetched on first run rather than shipped. The rest of the classpath is the transitive closure of the other rows — the AndroidX modules, JSpecify, and Guava\'s empty ListenableFuture placeholder — and is Apache-2.0.</string>
+    <!-- Licence names. The identifiers stay as they are; the plain-English one does not. -->
+    <string name="licence_gpl_classpath" translatable="false">GPLv2 with Classpath Exception</string>
+    <string name="licence_public_domain">Public domain</string>
+    <string name="licence_apache" translatable="false">Apache-2.0</string>
 </resources>

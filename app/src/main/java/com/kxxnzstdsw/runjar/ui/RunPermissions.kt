@@ -4,7 +4,9 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
+import com.kxxnzstdsw.runjar.R
 
 /**
  * A permission the app declares, and what the app does with it.
@@ -15,10 +17,15 @@ import androidx.core.content.ContextCompat
  * list below the user's business rather than an implementation detail — the
  * permissions the JAR would have carried are the app's.
  *
- * [purpose] describes the code that actually uses the permission, not what the
+ * [purposeRes] describes the code that actually uses the permission, not what the
  * permission would allow in general: the guide is what the user has to check the
  * app against, and a reason the app cannot be shown to act on is a reason it
  * should not have declared.
+ *
+ * The heading and the purpose are resource ids rather than their text, because
+ * they are read by the guide screen and nowhere else: the sentence the user
+ * reads is the translation the device asks for, in the same way every other
+ * string on that screen is.
  *
  * [introducedInApi] is the Android version the permission exists in, and
  * [askedAtRuntime] whether the platform asks the user for it rather than
@@ -31,60 +38,45 @@ enum class RunPermission(
     /** The declaration, exactly as the manifest spells it. */
     val manifestName: String,
     /** A heading in the user's terms. */
-    val label: String,
+    @param:StringRes val labelRes: Int,
     /** What the app does with it, in the user's terms. */
-    val purpose: String,
+    @param:StringRes val purposeRes: Int,
     val introducedInApi: Int,
     val askedAtRuntime: Boolean = false,
 ) {
     INTERNET(
         manifestName = Manifest.permission.INTERNET,
-        label = "Network access",
-        purpose = "Downloads the guest runtime the first time a JAR is run — " +
-            "jre<version>-pojav.zip, about 100 MB — and carries the run's own " +
-            "sockets: calling an API, fetching a URL, listening on a port. The " +
-            "JAR's traffic is the app's traffic, so without this it could not " +
-            "connect at all.",
+        labelRes = R.string.permission_internet_label,
+        purposeRes = R.string.permission_internet_purpose,
         introducedInApi = Build.VERSION_CODES.BASE,
     ),
 
     ACCESS_LOCAL_NETWORK(
         manifestName = Manifest.permission.ACCESS_LOCAL_NETWORK,
-        label = "Local network",
-        purpose = "Lets other devices reach a JAR that listens. From Android 17 the " +
-            "platform drops their connections without it, while the phone's own — " +
-            "loopback, and its own address on the network — keep working, so a JAR " +
-            "that serves looks fine on the phone and is unreachable from anywhere " +
-            "else. Asked for when a run starts.",
+        labelRes = R.string.permission_local_network_label,
+        purposeRes = R.string.permission_local_network_purpose,
         introducedInApi = Build.VERSION_CODES.CINNAMON_BUN,
         askedAtRuntime = true,
     ),
 
     FOREGROUND_SERVICE(
         manifestName = Manifest.permission.FOREGROUND_SERVICE,
-        label = "Keep a run going",
-        purpose = "Hosts the guest JVM in a foreground service. Android freezes a " +
-            "process that is merely in the background: its listening sockets stay " +
-            "open but nothing accepts on them, so a JAR that serves would stop " +
-            "answering the moment the app is left.",
+        labelRes = R.string.permission_foreground_service_label,
+        purposeRes = R.string.permission_foreground_service_purpose,
         introducedInApi = Build.VERSION_CODES.P,
     ),
 
     FOREGROUND_SERVICE_SPECIAL_USE(
         manifestName = Manifest.permission.FOREGROUND_SERVICE_SPECIAL_USE,
-        label = "Keep a run going: declared type",
-        purpose = "The foreground service type an app has to name for this kind of " +
-            "work — running a program the user supplied. The manifest declares it " +
-            "with the subtype property that says exactly that.",
+        labelRes = R.string.permission_foreground_service_type_label,
+        purposeRes = R.string.permission_foreground_service_type_purpose,
         introducedInApi = Build.VERSION_CODES.UPSIDE_DOWN_CAKE,
     ),
 
     POST_NOTIFICATIONS(
         manifestName = Manifest.permission.POST_NOTIFICATIONS,
-        label = "Notifications",
-        purpose = "Shows the ongoing notification for a run: which JAR is up, and a " +
-            "Stop action that ends it without reopening the app. Declining hides " +
-            "that notification and nothing else — the run is unaffected.",
+        labelRes = R.string.permission_notifications_label,
+        purposeRes = R.string.permission_notifications_purpose,
         introducedInApi = Build.VERSION_CODES.TIRAMISU,
         askedAtRuntime = true,
     ),

@@ -194,6 +194,47 @@ on a dark device while the starting window was white, so the launch was a flash
 of the wrong colour. Everything else about a launch is unchanged, including the
 icon on the starting window, which is the launcher's.
 
+## Languages
+
+The app is written in six languages and follows the device — there is no language
+setting inside it. Which one is shown is the platform's resource resolution, not
+something the app decides: `values/` is English and every other language is a
+folder beside it, so a device whose language matches a folder gets that folder,
+and a device that matches none gets English, as it would for any app that had not
+translated it.
+
+- `values/` — English. The default resources are also the fallback, so the app
+  still speaks on a device set to a language it does not ship.
+- `values-b+zh+Hans/` and `values-b+zh+Hant/` — Simplified and Traditional
+  Chinese. The two name the script rather than a region, which is what makes
+  zh-CN, zh-SG, zh-TW and zh-HK each resolve to the right one of the pair without
+  a folder per region.
+- `values-ja/`, `values-ru/`, `values-de/` — Japanese, Russian, German.
+
+Everything the app says comes from those files: the run screen's labels and its
+status line, the console's narration and a run's outcome (resolved in
+`RunViewModel` at the moment they happen), the notification and its channel
+(`JvmService`, in its own process — resources resolve per process, against the
+same locale), and the permission guide and About screens in full, whose prose is
+a string resource rather than a Compose literal for exactly this reason. The
+permission guide's headings and purposes are resource ids on `RunPermission`
+itself, which is the list a run asks from, so the text the guide explains and the
+request the app makes cannot come apart. Two kinds of text stay as they are in
+every language: the app's name, and the licence identifiers on the About screen —
+both marked `translatable="false"` in the default resources.
+
+From Android 13 the app also declares `res/xml/locales_config.xml`, which is what
+puts a language entry in Settings → Apps → runJar: those languages can be chosen
+per app, without turning the whole device into another language, and the platform
+applies the choice to every process the app runs. Below API 33 the list is
+ignored and the device's own language is the app's.
+
+A unit test holds the languages together. Every folder must define every key the
+default resources mark translatable, and every translation must name the same
+`%1$s`-style arguments as its English original: a missing key is not a crash but
+a screen that silently falls back to English mid-sentence, and a specifier lost
+in translation is a run of the wrong text.
+
 ## About and permissions
 
 The app explains itself in two screens, both reached from the run screen's top
@@ -266,8 +307,9 @@ The native bridge is built by CMake through the NDK for all four ABIs
 
 Unit tests cover the tar reader against a fixture with GNU long names,
 block-spanning payloads and zero-length files, assert the runtime archive
-carries a layer for every packaged ABI, and pin the permission guide to the
-manifest's permission set.
+carries a layer for every packaged ABI, pin the permission guide to the
+manifest's permission set, and hold every language to the default resources'
+key set and format arguments.
 
 The extraction tests additionally verify that unpacking the real layers yields
 a startable runtime. They need the archive and skip without it:

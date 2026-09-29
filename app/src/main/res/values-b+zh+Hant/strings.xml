@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The app's text, in English, as the default resources — the fallback every
+  device that matches no locale folder reads. Every key that is not marked
+  translatable="false" is therefore required in every folder under
+  values-<locale>/, and TranslationsTest holds them to that: a missing key is
+  not a crash, it is a screen that silently drops back to English.
+
+  A format specifier is part of the key's contract, not of the sentence: the
+  positional arguments (%1$s, %2$d), the escaped literal percent (%%) and the
+  XML escapes (\' for an apostrophe, \" around a quoted word) are identical in
+  every translation, and the test compares them.
+-->
+<resources>
+    <!-- The run screen: the top bar, the form, and the status line. -->
+    <string name="title_run">執行 JAR</string>
+    <string name="title_about">關於</string>
+    <string name="title_permissions">權限</string>
+    <string name="jar_none">未選擇 JAR</string>
+    <string name="jar_choose">選擇檔案</string>
+    <string name="jar_sample">範例 JAR</string>
+    <string name="runtime_label">客體執行階段</string>
+    <!-- %1$s is the runtime's label, for example "Java 21". -->
+    <string name="runtime_installed">%1$s（已安裝）</string>
+    <!-- %1$d is the heap size in mebibytes. -->
+    <string name="heap_label">客體堆積：%1$d MB</string>
+    <string name="main_class_label">主類別</string>
+    <string name="args_label">引數</string>
+    <string name="action_run">執行</string>
+    <string name="action_running">執行中…</string>
+    <string name="action_stop">停止</string>
+    <!-- %1$d is the download's percentage, and %% is a literal percent sign. -->
+    <string name="status_fetching">正在下載 Java %1$d%%</string>
+    <string name="console_title">主控台</string>
+    <string name="console_clear">清除</string>
+    <string name="console_empty">JAR 的 main() 輸出會顯示在這裡。</string>
+
+    <!-- What the run says in the console, and how it ends. -->
+    <!-- %1$s is the JAR's file name. -->
+    <string name="console_selected">已選擇 %1$s</string>
+    <!-- %1$s is the file name, %2$s the main class read from its manifest. -->
+    <string name="console_sample_loaded">已載入 %1$s，主類別為 %2$s</string>
+    <!-- %1$s is the directory the JAR runs in. -->
+    <string name="console_run_directory">=== 執行於 %1$s ===</string>
+    <string name="error_read_selected_file">無法讀取所選的檔案</string>
+    <string name="error_sample_jar">無法載入範例 JAR</string>
+    <string name="error_choose_jar">請先選擇 JAR</string>
+    <string name="error_main_class_required">請輸入主類別</string>
+    <!-- %1$s is the failure's message. -->
+    <string name="error_runtime_install">執行階段安裝失敗：%1$s</string>
+    <string name="outcome_run_finished">執行完成</string>
+    <string name="outcome_guest_ended">客體 JVM 已結束 — 請見主控台</string>
+    <string name="outcome_adopted_guest">客體 JVM 仍在執行 — 按下「停止」將它關閉</string>
+    <string name="outcome_stopped">已停止</string>
+    <string name="outcome_main_returned">main 已返回。JVM 仍在執行 — 按下「停止」將它關閉</string>
+    <string name="outcome_jar_finished">JAR 已執行完畢</string>
+
+    <!-- The ongoing notification for a run. -->
+    <!-- %1$s is the JAR's file name. -->
+    <string name="notification_running">正在執行 %1$s</string>
+    <string name="notification_running_detail">Java 應用程式正在執行</string>
+    <string name="notification_channel_description">在 JAR 執行期間顯示</string>
+
+    <!-- The permission guide. -->
+    <string name="permission_guide_intro">runJar 會下載 Java 執行階段並在本應用程式內啟動它，因此 JAR 會在本應用程式的權限下執行 — JAR 本身的資訊清單權限不會合併到 APK 中。應用程式宣告的一切都在下方，並說明其用途。</string>
+    <string name="permission_guide_closing">這兩項執行階段權限會在開始執行時要求。拒絕其中一項只會失去它原本的用途：從不等待其他裝置連線的 JAR 永遠不會察覺差異。</string>
+    <string name="action_grant_now">立即授權</string>
+    <string name="action_continue">繼續</string>
+    <string name="permission_state_install_time">安裝時即已授予</string>
+    <string name="permission_state_not_on_version">此版本不需要</string>
+    <string name="permission_state_granted">已授予</string>
+    <string name="permission_state_denied">未授予</string>
+
+    <string name="permission_internet_label">網路存取</string>
+    <string name="permission_internet_purpose">首次執行 JAR 時下載客體執行階段 — jre&lt;version&gt;-pojav.zip，約 100 MB — 並承載執行本身的通訊端：呼叫 API、擷取 URL、在連接埠上接聽。JAR 的流量就是應用程式的流量，因此沒有這項權限就完全無法連線。</string>
+    <string name="permission_local_network_label">本機網路</string>
+    <string name="permission_local_network_purpose">讓其他裝置能連線到正在接聽的 JAR。從 Android 17 起，若沒有這項權限，平台會捨棄它們的連線，而手機本身的連線 — 迴路，以及它在網路上的自身位址 — 仍可運作，因此提供服務的 JAR 在手機上看起來正常，卻無法從其他任何地方連線。開始執行時會要求。</string>
+    <string name="permission_foreground_service_label">讓執行持續進行</string>
+    <string name="permission_foreground_service_purpose">在前景服務中裝載客體 JVM。Android 會凍結僅處於背景的程序：其接聽中的通訊端仍保持開啟，但沒有任何東西會接受連線，因此提供服務的 JAR 會在離開應用程式的當下停止回應。</string>
+    <string name="permission_foreground_service_type_label">讓執行持續進行：宣告的類型</string>
+    <string name="permission_foreground_service_type_purpose">應用程式為這類工作 — 執行使用者提供的程式 — 必須指明的前景服務類型。資訊清單會以正好表達此意的子類型屬性來宣告它。</string>
+    <string name="permission_notifications_label">通知</string>
+    <string name="permission_notifications_purpose">顯示執行期間的常駐通知：哪個 JAR 正在運作，以及可在不重新開啟應用程式的情況下結束它的「停止」動作。拒絕只會隱藏該通知，別無其他影響 — 執行不受影響。</string>
+
+    <!-- About: what the app does, how it does it, and what it is built from. -->
+    <string name="about_section_purpose">功能</string>
+    <string name="about_purpose_body">在 Android 上以未經修改的方式執行任意 Java JAR。Android 本身的執行階段是 ART，它執行 DEX 位元碼，無法執行標準 JAR，因此本應用程式並不試圖讓它做到：它會在應用程式內啟動完整的 OpenJDK 虛擬機器，並將 JAR 交給該 VM。</string>
+    <string name="about_section_method">運作方式</string>
+    <string name="about_method_runtime">客體執行階段會下載一次到應用程式自己的儲存空間 — 約 100 MB — 並在該處解壓縮。二進位檔無法從共用儲存空間執行，而客體的程式庫無論如何都是以絕對路徑載入。</string>
+    <string name="about_method_bridge">一個小型的原生橋接層讓該執行階段的程式庫可供存取，接著從中 dlopen() libjvm.so。啟動的 VM 獨立於 ART：它的類別是執行階段自己的，並在其自身的類別載入器之下。</string>
+    <string name="about_method_service">客體在自己的程序中（\":jvm\" 程序）以前景服務的形式執行，因此提供服務的 JAR 在你離開應用程式後仍會繼續提供服務，而客體中的錯誤只會讓該程序結束 — 不會影響畫面。</string>
+    <string name="about_method_process">一個 JVM 每個程序只允許一個 VM，且其關閉在此處是空操作，因此被重複使用的是程序：每次執行都會啟動一個全新的程序，這也是 `java -jar` 每次叫用時所給予的。</string>
+    <string name="about_method_console">JAR 列印的一切都會重新導向到單一資料流並顯示在主控台中，並以執行本身所在的目錄作為其工作目錄 — 位於應用程式的儲存空間內，因此不需要任何儲存權限。</string>
+    <string name="about_section_credits">致謝</string>
+    <string name="about_credits_body">執行階段的取得方式與裝置上的啟動方法來自 MojoLauncher：其滾動發行版會發佈執行階段封存檔，而讓它們能啟動的 Android 修正，正是它的移植版本 — 以及更早的 PojavLauncher — 所找出的。連結器搜尋路徑、程式庫預先載入、freetype 的更名，以及 xz 封存檔的讀取器，全都出自它們。</string>
+    <string name="about_credits_runtime_body">這些封存檔內的執行階段是 OpenJDK，由 OpenJDK Mobile 移植版本為 Android 建置。建置它們的儲存庫並未宣告自己的授權條款；它所封裝的 Java 執行階段是 OpenJDK 的。</string>
+    <string name="about_section_licences">元件與授權條款</string>
+    <string name="about_licences_note">OpenJDK 是客體執行階段，於首次執行時下載而非隨附。類別路徑的其餘部分是其他各列 — AndroidX 模組、JSpecify，以及 Guava 空的 ListenableFuture 預留位置 — 的遞移閉包，並採用 Apache-2.0。</string>
+    <!-- Licence names. The identifiers stay as they are; the plain-English one does not. -->
+    <string name="licence_public_domain">公有領域</string>
+</resources>

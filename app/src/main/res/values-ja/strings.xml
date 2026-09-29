@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The app's text, in English, as the default resources — the fallback every
+  device that matches no locale folder reads. Every key that is not marked
+  translatable="false" is therefore required in every folder under
+  values-<locale>/, and TranslationsTest holds them to that: a missing key is
+  not a crash, it is a screen that silently drops back to English.
+
+  A format specifier is part of the key's contract, not of the sentence: the
+  positional arguments (%1$s, %2$d), the escaped literal percent (%%) and the
+  XML escapes (\' for an apostrophe, \" around a quoted word) are identical in
+  every translation, and the test compares them.
+-->
+<resources>
+    <!-- The app's own name: a proper noun, the same in every language. -->
+
+    <!-- The run screen: the top bar, the form, and the status line. -->
+    <string name="title_run">JAR を実行</string>
+    <string name="title_about">アプリについて</string>
+    <string name="title_permissions">権限</string>
+    <string name="jar_none">JAR が選択されていません</string>
+    <string name="jar_choose">ファイルを選択</string>
+    <string name="jar_sample">サンプル JAR</string>
+    <string name="runtime_label">ゲストランタイム</string>
+    <!-- %1$s is the runtime's label, for example "Java 21". -->
+    <string name="runtime_installed">%1$s (インストール済み)</string>
+    <!-- %1$d is the heap size in mebibytes. -->
+    <string name="heap_label">ゲストヒープ: %1$d MB</string>
+    <string name="main_class_label">メインクラス</string>
+    <string name="args_label">引数</string>
+    <string name="action_run">実行</string>
+    <string name="action_running">実行中…</string>
+    <string name="action_stop">停止</string>
+    <!-- %1$d is the download's percentage, and %% is a literal percent sign. -->
+    <string name="status_fetching">Java %1$d%% をダウンロード中</string>
+    <string name="console_title">コンソール</string>
+    <string name="console_clear">クリア</string>
+    <string name="console_empty">JAR の main() の出力がここに表示されます。</string>
+
+    <!-- What the run says in the console, and how it ends. -->
+    <!-- %1$s is the JAR's file name. -->
+    <string name="console_selected">%1$s を選択しました</string>
+    <!-- %1$s is the file name, %2$s the main class read from its manifest. -->
+    <string name="console_sample_loaded">%1$s をメインクラス %2$s で読み込みました</string>
+    <!-- %1$s is the directory the JAR runs in. -->
+    <string name="console_run_directory">=== %1$s で実行中 ===</string>
+    <string name="error_read_selected_file">選択したファイルを読み込めませんでした</string>
+    <string name="error_sample_jar">サンプル JAR を読み込めませんでした</string>
+    <string name="error_choose_jar">先に JAR を選択してください</string>
+    <string name="error_main_class_required">メインクラスを入力してください</string>
+    <!-- %1$s is the failure's message. -->
+    <string name="error_runtime_install">ランタイムのインストールに失敗しました: %1$s</string>
+    <string name="outcome_run_finished">実行が完了しました</string>
+    <string name="outcome_guest_ended">ゲスト JVM が終了しました — コンソールを確認してください</string>
+    <string name="outcome_adopted_guest">ゲスト JVM はまだ実行中です — 停止を押して終了させてください</string>
+    <string name="outcome_stopped">停止しました</string>
+    <string name="outcome_main_returned">main が戻りました。JVM はまだ実行中です — 停止を押して終了させてください</string>
+    <string name="outcome_jar_finished">JAR が終了しました</string>
+
+    <!-- The ongoing notification for a run. -->
+    <!-- %1$s is the JAR's file name. -->
+    <string name="notification_running">%1$s を実行中</string>
+    <string name="notification_running_detail">Java アプリケーションを実行中です</string>
+    <string name="notification_channel_description">JAR の実行中に表示されます</string>
+
+    <!-- The permission guide. -->
+    <string name="permission_guide_intro">runJar は Java ランタイムをダウンロードしてこのアプリ内で起動するため、JAR はこのアプリの権限で実行されます — JAR 自身のマニフェストの権限が APK に統合されることはありません。アプリが宣言しているものはすべて以下に、それをどう扱うかとともに示します。</string>
+    <string name="permission_guide_closing">2 つのランタイム権限は実行の開始時に要求されます。どちらかを拒否して失うのは、その権限が担う機能だけです。他のデバイスからの接続を一切待ち受けない JAR は違いに気づきません。</string>
+    <string name="action_grant_now">今すぐ許可</string>
+    <string name="action_continue">続行</string>
+    <string name="permission_state_install_time">インストール時に許可</string>
+    <string name="permission_state_not_on_version">このバージョンでは不要</string>
+    <string name="permission_state_granted">許可済み</string>
+    <string name="permission_state_denied">未許可</string>
+
+    <string name="permission_internet_label">ネットワークアクセス</string>
+    <string name="permission_internet_purpose">初めて JAR を実行するときにゲストランタイム — jre&lt;version&gt;-pojav.zip、約 100 MB — をダウンロードし、実行自体のソケットを担います。API の呼び出し、URL の取得、ポートでの待ち受けなどです。JAR の通信はアプリの通信であるため、これがなければ一切接続できません。</string>
+    <string name="permission_local_network_label">ローカルネットワーク</string>
+    <string name="permission_local_network_purpose">待ち受ける JAR に他のデバイスが到達できるようにします。Android 17 以降では、これがないとプラットフォームがそれらの接続を切断しますが、スマートフォン自身の接続 — ループバックと、ネットワーク上の自身のアドレス — は引き続き機能します。そのため、サービスを提供する JAR はスマートフォン上では正常に見えても、他のどこからも到達できません。実行の開始時に要求されます。</string>
+    <string name="permission_foreground_service_label">実行を継続</string>
+    <string name="permission_foreground_service_purpose">ゲスト JVM をフォアグラウンドサービスでホストします。Android は単にバックグラウンドにあるプロセスをフリーズします。待ち受けソケットは開いたままでも、そこで何も受け付けないため、サービスを提供する JAR はアプリを離れた瞬間に応答をやめてしまいます。</string>
+    <string name="permission_foreground_service_type_label">実行を継続: 宣言されたタイプ</string>
+    <string name="permission_foreground_service_type_purpose">この種の作業 — ユーザーが提供したプログラムの実行 — のためにアプリが指定しなければならないフォアグラウンドサービスのタイプです。マニフェストでは、まさにそれを示すサブタイププロパティでこれを宣言しています。</string>
+    <string name="permission_notifications_label">通知</string>
+    <string name="permission_notifications_purpose">実行中の通知を表示します。どの JAR が動作中か、そしてアプリを開き直さずに終了させる停止アクションです。拒否するとその通知が隠れるだけで、他には何も起こりません — 実行には影響しません。</string>
+
+    <!-- About: what the app does, how it does it, and what it is built from. -->
+    <string name="about_section_purpose">できること</string>
+    <string name="about_purpose_body">任意の Java JAR を Android 上で改変せずに実行します。Android 自身のランタイムである ART は DEX バイトコードを実行するもので、標準の JAR は実行できないため、このアプリはそれを実現しようとはしません。代わりにアプリ内で完全な OpenJDK 仮想マシンを起動し、その VM に JAR を渡します。</string>
+    <string name="about_section_method">仕組み</string>
+    <string name="about_method_runtime">ゲストランタイムは一度だけアプリ自身のストレージに取得され — 約 100 MB — そこで展開されます。共有ストレージからバイナリを実行することはできず、そもそもゲストのライブラリは絶対パスで読み込まれます。</string>
+    <string name="about_method_bridge">小さなネイティブブリッジがそのランタイムのライブラリを到達可能にし、そこから dlopen() で libjvm.so を読み込みます。起動する VM は ART から独立しています。そのクラスはランタイム自身のもので、独自のクラスローダーに属します。</string>
+    <string name="about_method_service">ゲストは専用のプロセス (\":jvm\" プロセス) でフォアグラウンドサービスとして動作するため、サービスを提供する JAR はアプリを離れた後も提供を続け、ゲストの障害はそのプロセスだけを停止させます — 画面には影響しません。</string>
+    <string name="about_method_process">JVM は 1 プロセスにつき 1 つの VM しか許さず、そのシャットダウンはここでは何も行わないため、再利用されるのはプロセスです。実行のたびに新しいプロセスを起動しますが、これは `java -jar` が呼び出しごとに行うことでもあります。</string>
+    <string name="about_method_console">JAR が出力するものはすべて 1 つのストリームにリダイレクトされてコンソールに表示され、実行自身のディレクトリが作業ディレクトリになります — これはアプリのストレージ内にあるため、ストレージ権限は必要ありません。</string>
+    <string name="about_section_credits">クレジット</string>
+    <string name="about_credits_body">ランタイムの取得とデバイス上での起動手順は MojoLauncher によるものです。そのローリングリリースがランタイムのアーカイブを公開しており、それらを起動させるための Android 向け修正は、その移植版 — そしてそれ以前の PojavLauncher — が編み出したものです。リンカーの検索パス、ライブラリのプリロード、freetype のリネーム、xz アーカイブのリーダーはすべて同プロジェクトによるものです。</string>
+    <string name="about_credits_runtime_body">これらのアーカイブ内のランタイムは OpenJDK で、OpenJDK Mobile ポートから Android 向けにビルドされたものです。それらをビルドするリポジトリは独自のライセンスを宣言していません。そこでパッケージ化されている Java ランタイムは OpenJDK のものです。</string>
+    <string name="about_section_licences">コンポーネントとライセンス</string>
+    <string name="about_licences_note">OpenJDK はゲストランタイムであり、同梱されるのではなく初回実行時に取得されます。クラスパスの残りは他の行の推移的閉包 — AndroidX モジュール、JSpecify、Guava の空の ListenableFuture プレースホルダー — であり、Apache-2.0 です。</string>
+    <!-- Licence names. The identifiers stay as they are; the plain-English one does not. -->
+    <string name="licence_public_domain">パブリックドメイン</string>
+</resources>

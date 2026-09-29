@@ -1,5 +1,6 @@
 package com.kxxnzstdsw.runjar.ui
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,8 +20,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.kxxnzstdsw.runjar.R
 
 /** Where the guest runtime comes from, for the credit that names it. */
 private const val MOJOLAUNCHER =
@@ -44,7 +47,7 @@ private const val MOJOLAUNCHER =
 @Composable
 fun AboutScreen() {
     Scaffold(
-        topBar = { TopAppBar(title = { Text("About") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.title_about)) }) },
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -53,10 +56,18 @@ fun AboutScreen() {
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item { Section("What it does") { Purpose() } }
-            item { Section("How it works") { Method() } }
-            item { Section("Credits") { Credits() } }
-            item { Section("Components and licences") { Licences() } }
+            item {
+                Section(stringResource(R.string.about_section_purpose)) { Purpose() }
+            }
+            item {
+                Section(stringResource(R.string.about_section_method)) { Method() }
+            }
+            item {
+                Section(stringResource(R.string.about_section_credits)) { Credits() }
+            }
+            item {
+                Section(stringResource(R.string.about_section_licences)) { Licences() }
+            }
         }
     }
 }
@@ -82,43 +93,17 @@ private fun Paragraph(text: String) {
 
 @Composable
 private fun Purpose() {
-    Paragraph(
-        "Runs an arbitrary Java JAR on Android, unmodified. Android's own runtime is " +
-            "ART, which executes DEX bytecode and cannot run a standard JAR, so this " +
-            "app does not try to make it: it starts a complete OpenJDK virtual machine " +
-            "inside the app and hands the JAR to that VM.",
-    )
+    Paragraph(stringResource(R.string.about_purpose_body))
 }
 
 @Composable
 private fun Method() {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Bullet(
-            "The guest runtime is fetched once into the app's own storage — about " +
-                "100 MB — and unpacked there. Binaries cannot be executed from shared " +
-                "storage, and the guest's libraries are loaded by absolute path anyway.",
-        )
-        Bullet(
-            "A small native bridge makes that runtime's libraries reachable, then " +
-                "dlopen()s libjvm.so from it. The VM that comes up is independent of " +
-                "ART: its classes are the runtime's own, under its own class loader.",
-        )
-        Bullet(
-            "The guest runs in a process of its own (the \":jvm\" process) as a " +
-                "foreground service, so a JAR that serves keeps serving after you " +
-                "leave the app, and a fault in the guest takes down only that process " +
-                "— not the screen.",
-        )
-        Bullet(
-            "A JVM allows one VM per process and its shutdown is a no-op here, so the " +
-                "process is what gets reused: every run starts a fresh one, which is " +
-                "what `java -jar` gives each invocation too.",
-        )
-        Bullet(
-            "Everything the JAR prints is redirected into one stream and shown in the " +
-                "console, with the run's own directory as its working directory — " +
-                "inside the app's storage, so nothing needs a storage permission.",
-        )
+        Bullet(stringResource(R.string.about_method_runtime))
+        Bullet(stringResource(R.string.about_method_bridge))
+        Bullet(stringResource(R.string.about_method_service))
+        Bullet(stringResource(R.string.about_method_process))
+        Bullet(stringResource(R.string.about_method_console))
     }
 }
 
@@ -134,14 +119,7 @@ private fun Bullet(text: String) {
 private fun Credits() {
     val uriHandler = LocalUriHandler.current
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Paragraph(
-            "Runtime acquisition and the on-device startup recipe came from " +
-                "MojoLauncher: its rolling release publishes the runtime archives, and " +
-                "the Android fixes that make them start are the ones its ports — and " +
-                "PojavLauncher's before them — worked out. The linker search path, the " +
-                "library preload, the freetype rename and the reader for the xz " +
-                "archives are all theirs.",
-        )
+        Paragraph(stringResource(R.string.about_credits_body))
         Text(
             text = MOJOLAUNCHER,
             style = MaterialTheme.typography.bodySmall,
@@ -149,11 +127,7 @@ private fun Credits() {
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.clickable { uriHandler.openUri(MOJOLAUNCHER) },
         )
-        Paragraph(
-            "The runtime inside those archives is OpenJDK, built for Android from the " +
-                "OpenJDK Mobile port. The repository that builds them declares no " +
-                "licence of its own; the Java runtime it packages is OpenJDK's.",
-        )
+        Paragraph(stringResource(R.string.about_credits_runtime_body))
     }
 }
 
@@ -162,15 +136,19 @@ private fun Credits() {
  *
  * The runtime is fetched rather than shipped, but it is still a component of
  * what the user ends up running, so it is listed with the rest.
+ *
+ * [name] is a proper noun or an artifact coordinate — OpenJDK, kotlinx.coroutines
+ * — and reads the same in every language, so it is text. [licenceRes] is a
+ * resource because one of the licences is a phrase rather than an identifier.
  */
-private data class Component(val name: String, val licence: String)
+private data class Component(val name: String, @param:StringRes val licenceRes: Int)
 
 private val COMPONENTS = listOf(
-    Component("OpenJDK", "GPLv2 with Classpath Exception"),
-    Component("XZ for Java (org.tukaani:xz)", "Public domain"),
-    Component("AndroidX / Jetpack Compose", "Apache-2.0"),
-    Component("Kotlin standard library", "Apache-2.0"),
-    Component("kotlinx.coroutines", "Apache-2.0"),
+    Component("OpenJDK", R.string.licence_gpl_classpath),
+    Component("XZ for Java (org.tukaani:xz)", R.string.licence_public_domain),
+    Component("AndroidX / Jetpack Compose", R.string.licence_apache),
+    Component("Kotlin standard library", R.string.licence_apache),
+    Component("kotlinx.coroutines", R.string.licence_apache),
 )
 
 @Composable
@@ -187,17 +165,12 @@ private fun Licences() {
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    text = component.licence,
+                    text = stringResource(component.licenceRes),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
-        Paragraph(
-            "OpenJDK is the guest runtime, fetched on first run rather than shipped. " +
-                "The rest of the classpath is the transitive closure of the other rows " +
-                "— the AndroidX modules, JSpecify, and Guava's empty ListenableFuture " +
-                "placeholder — and is Apache-2.0.",
-        )
+        Paragraph(stringResource(R.string.about_licences_note))
     }
 }

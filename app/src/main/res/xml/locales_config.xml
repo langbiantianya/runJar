@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The languages this app has resources for, named the way the platform names
+  them. From Android 13 (API 33) the system reads this to offer a per-app
+  language picker — Settings > Apps > runJar > Language — which is the one place
+  the app's language can be set without changing the whole device; below that the
+  list is ignored and the app follows the device, which is what it does anyway.
+
+  These tags are the contract the resource folders are matched against:
+  `zh-Hans` and `zh-Hant` name the script rather than a region, so every Chinese
+  locale — zh-CN, zh-SG, zh-TW, zh-HK — resolves to the right one of the two on
+  its own. `en` has no folder of its own because `values/` is English already.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="zh-Hans" />
+    <locale android:name="zh-Hant" />
+    <locale android:name="ja" />
+    <locale android:name="en" />
+    <locale android:name="ru" />
+    <locale android:name="de" />
+</locale-config>

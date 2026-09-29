@@ -41,12 +41,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kxxnzstdsw.runjar.R
 
 /** The heap sizes the picker offers, in mebibytes. */
 private val HEAP_CHOICES_MB = listOf(128, 256, 512, 768)
@@ -92,10 +94,12 @@ fun RunJarScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Run JAR") },
+                title = { Text(stringResource(R.string.title_run)) },
                 actions = {
-                    TextButton(onClick = onShowPermissionGuide) { Text("Permissions") }
-                    TextButton(onClick = onShowAbout) { Text("About") }
+                    TextButton(onClick = onShowPermissionGuide) {
+                        Text(stringResource(R.string.title_permissions))
+                    }
+                    TextButton(onClick = onShowAbout) { Text(stringResource(R.string.title_about)) }
                 },
             )
         },
@@ -148,7 +152,7 @@ fun RunJarScreen(
                         OutlinedTextField(
                             value = state.mainClass,
                             onValueChange = viewModel::onMainClassChange,
-                            label = { Text("Main class") },
+                            label = { Text(stringResource(R.string.main_class_label)) },
                             placeholder = { Text("hello.Hello") },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
@@ -156,7 +160,7 @@ fun RunJarScreen(
                         OutlinedTextField(
                             value = state.argsInput,
                             onValueChange = viewModel::onArgsChange,
-                            label = { Text("Arguments") },
+                            label = { Text(stringResource(R.string.args_label)) },
                             singleLine = true,
                             modifier = Modifier.weight(1f),
                         )
@@ -217,7 +221,7 @@ private fun JarSelector(jarName: String?, onPick: () -> Unit, onUseSample: () ->
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                text = jarName ?: "No JAR selected",
+                text = jarName ?: stringResource(R.string.jar_none),
                 style = MaterialTheme.typography.bodyMedium,
                 // A long file name must not wrap and steal height from the console.
                 maxLines = 1,
@@ -230,10 +234,10 @@ private fun JarSelector(jarName: String?, onPick: () -> Unit, onUseSample: () ->
                 // Weighted so the pair always fits the width, however narrow the
                 // window is or however long the labels grow.
                 OutlinedButton(onClick = onPick, modifier = Modifier.weight(1f)) {
-                    Text("Choose file", maxLines = 1)
+                    Text(stringResource(R.string.jar_choose), maxLines = 1)
                 }
                 OutlinedButton(onClick = onUseSample, modifier = Modifier.weight(1f)) {
-                    Text("Sample JAR", maxLines = 1)
+                    Text(stringResource(R.string.jar_sample), maxLines = 1)
                 }
             }
         }
@@ -254,10 +258,10 @@ private fun RuntimeSelector(
         onExpandedChange = { expanded = it },
     ) {
         OutlinedTextField(
-            value = selected.label + if (selected.id in installed) " (installed)" else "",
+            value = selected.withInstalledMark(installed),
             onValueChange = {},
             readOnly = true,
-            label = { Text("Guest runtime") },
+            label = { Text(stringResource(R.string.runtime_label)) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
             modifier = Modifier
                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
@@ -266,9 +270,7 @@ private fun RuntimeSelector(
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             RunViewModel.RELEASE_OPTIONS.forEach { option ->
                 DropdownMenuItem(
-                    text = {
-                        Text(option.label + if (option.id in installed) " (installed)" else "")
-                    },
+                    text = { Text(option.withInstalledMark(installed)) },
                     onClick = {
                         onSelect(option)
                         expanded = false
@@ -279,10 +281,25 @@ private fun RuntimeSelector(
     }
 }
 
+/**
+ * The runtime's label with the mark a runtime already fetched on the device
+ * carries.
+ *
+ * The mark is a string of its own rather than a suffix glued on here, so a
+ * language that phrases it differently — or places it before the label — says
+ * so in its own resources instead of inheriting English word order.
+ */
+@Composable
+private fun JreReleaseOption.withInstalledMark(installed: Set<String>): String =
+    if (id in installed) stringResource(R.string.runtime_installed, label) else label
+
 @Composable
 private fun HeapSelector(heapMb: Int, onSelect: (Int) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text("Guest heap: $heapMb MB", style = MaterialTheme.typography.labelMedium)
+        Text(
+            text = stringResource(R.string.heap_label, heapMb),
+            style = MaterialTheme.typography.labelMedium,
+        )
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
@@ -326,7 +343,13 @@ private fun RunControls(
         ) {
             // Busy for as long as the JAR is: while its `main` runs, and while a
             // guest left behind by it still serves.
-            Text(if (busy) "Running…" else "Run")
+            Text(
+                if (busy) {
+                    stringResource(R.string.action_running)
+                } else {
+                    stringResource(R.string.action_run)
+                },
+            )
         }
         OutlinedButton(
             onClick = onStop,
@@ -335,7 +358,7 @@ private fun RunControls(
             enabled = guestAlive,
             modifier = Modifier.weight(1f),
         ) {
-            Text("Stop")
+            Text(stringResource(R.string.action_stop))
         }
     }
 }
@@ -354,7 +377,10 @@ private fun RunStatus(state: RunState) {
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                "Fetching Java ${state.progress.times(100).toInt()}%",
+                stringResource(
+                    R.string.status_fetching,
+                    state.progress.times(100).toInt(),
+                ),
                 style = MaterialTheme.typography.labelSmall,
             )
         }
@@ -401,12 +427,15 @@ private fun Console(lines: List<String>, onClear: () -> Unit, modifier: Modifier
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Console", style = MaterialTheme.typography.titleSmall)
-                OutlinedButton(onClick = onClear) { Text("Clear") }
+                Text(
+                    stringResource(R.string.console_title),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                OutlinedButton(onClick = onClear) { Text(stringResource(R.string.console_clear)) }
             }
             if (lines.isEmpty()) {
                 Text(
-                    "Output from the JAR's main() appears here.",
+                    stringResource(R.string.console_empty),
                     style = MaterialTheme.typography.bodySmall,
                 )
             } else {

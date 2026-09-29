@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The app's text, in English, as the default resources — the fallback every
+  device that matches no locale folder reads. Every key that is not marked
+  translatable="false" is therefore required in every folder under
+  values-<locale>/, and TranslationsTest holds them to that: a missing key is
+  not a crash, it is a screen that silently drops back to English.
+
+  A format specifier is part of the key's contract, not of the sentence: the
+  positional arguments (%1$s, %2$d), the escaped literal percent (%%) and the
+  XML escapes (\' for an apostrophe, \" around a quoted word) are identical in
+  every translation, and the test compares them.
+-->
+<resources>
+
+    <!-- The app's own name: a proper noun, the same in every language. -->
+
+    <!-- The run screen: the top bar, the form, and the status line. -->
+    <string name="title_run">JAR starten</string>
+    <string name="title_about">Über</string>
+    <string name="title_permissions">Berechtigungen</string>
+    <string name="jar_none">Kein JAR ausgewählt</string>
+    <string name="jar_choose">Datei auswählen</string>
+    <string name="jar_sample">Beispiel-JAR</string>
+    <string name="runtime_label">Gast-Laufzeitumgebung</string>
+    <!-- %1$s is the runtime's label, for example "Java 21". -->
+    <string name="runtime_installed">%1$s (installiert)</string>
+    <!-- %1$d is the heap size in mebibytes. -->
+    <string name="heap_label">Gast-Heap: %1$d MB</string>
+    <string name="main_class_label">Hauptklasse</string>
+    <string name="args_label">Argumente</string>
+    <string name="action_run">Starten</string>
+    <string name="action_running">Läuft…</string>
+    <string name="action_stop">Stoppen</string>
+    <!-- %1$d is the download's percentage, and %% is a literal percent sign. -->
+    <string name="status_fetching">Java wird geladen: %1$d%%</string>
+    <string name="console_title">Konsole</string>
+    <string name="console_clear">Leeren</string>
+    <string name="console_empty">Hier erscheint die Ausgabe von main() des JAR.</string>
+
+    <!-- What the run says in the console, and how it ends. -->
+    <!-- %1$s is the JAR's file name. -->
+    <string name="console_selected">%1$s ausgewählt</string>
+    <!-- %1$s is the file name, %2$s the main class read from its manifest. -->
+    <string name="console_sample_loaded">%1$s mit Hauptklasse %2$s geladen</string>
+    <!-- %1$s is the directory the JAR runs in. -->
+    <string name="console_run_directory">=== Ausführung in %1$s ===</string>
+    <string name="error_read_selected_file">Die ausgewählte Datei konnte nicht gelesen werden</string>
+    <string name="error_sample_jar">Das Beispiel-JAR konnte nicht geladen werden</string>
+    <string name="error_choose_jar">Wählen Sie zuerst ein JAR aus</string>
+    <string name="error_main_class_required">Geben Sie eine Hauptklasse ein</string>
+    <!-- %1$s is the failure's message. -->
+    <string name="error_runtime_install">Installation der Laufzeitumgebung fehlgeschlagen: %1$s</string>
+    <string name="outcome_run_finished">Ausführung beendet</string>
+    <string name="outcome_guest_ended">Die Gast-JVM wurde beendet — siehe Konsole</string>
+    <string name="outcome_adopted_guest">Eine Gast-JVM läuft noch — drücken Sie Stoppen, um sie zu beenden</string>
+    <string name="outcome_stopped">Gestoppt</string>
+    <string name="outcome_main_returned">Main ist zurückgekehrt. Die JVM läuft noch — drücken Sie Stoppen, um sie zu beenden</string>
+    <string name="outcome_jar_finished">Das JAR ist beendet</string>
+
+    <!-- The ongoing notification for a run. -->
+    <!-- %1$s is the JAR's file name. -->
+    <string name="notification_running">%1$s wird ausgeführt</string>
+    <string name="notification_running_detail">Die Java-Anwendung wird ausgeführt</string>
+    <string name="notification_channel_description">Wird angezeigt, während ein JAR ausgeführt wird</string>
+
+    <!-- The permission guide. -->
+    <string name="permission_guide_intro">runJar lädt eine Java-Laufzeitumgebung herunter und startet sie innerhalb dieser App, sodass das JAR unter den Berechtigungen dieser App läuft — die eigenen Manifest-Berechtigungen eines JAR werden nicht in die APK eingefügt. Alles, was die App deklariert, steht unten, zusammen mit dem, wofür sie es nutzt.</string>
+    <string name="permission_guide_closing">Die beiden Laufzeitberechtigungen werden beim Start einer Ausführung abgefragt. Eine abzulehnen kostet nur das, wofür sie da ist: Ein JAR, das nie auf andere Geräte lauscht, bemerkt den Unterschied nie.</string>
+    <string name="action_grant_now">Jetzt erteilen</string>
+    <string name="action_continue">Weiter</string>
+    <string name="permission_state_install_time">Bei Installation erteilt</string>
+    <string name="permission_state_not_on_version">Auf dieser Version nicht erforderlich</string>
+    <string name="permission_state_granted">Erteilt</string>
+    <string name="permission_state_denied">Nicht erteilt</string>
+
+    <string name="permission_internet_label">Netzwerkzugriff</string>
+    <string name="permission_internet_purpose">Lädt die Gast-Laufzeitumgebung beim ersten Ausführen eines JAR herunter — jre&lt;version&gt;-pojav.zip, etwa 100 MB — und trägt die eigenen Sockets der Ausführung: eine API aufrufen, eine URL abrufen, auf einem Port lauschen. Der Datenverkehr des JAR ist der Datenverkehr der App, ohne diese Berechtigung könnte es also gar keine Verbindung aufbauen.</string>
+    <string name="permission_local_network_label">Lokales Netzwerk</string>
+    <string name="permission_local_network_purpose">Lässt andere Geräte ein JAR erreichen, das lauscht. Ab Android 17 verwirft die Plattform ohne sie deren Verbindungen, während die eigenen des Telefons — Loopback und seine eigene Adresse im Netzwerk — weiter funktionieren; ein JAR, das Dienste bereitstellt, sieht auf dem Telefon also in Ordnung aus und ist von überall sonst unerreichbar. Wird beim Start einer Ausführung abgefragt.</string>
+    <string name="permission_foreground_service_label">Eine Ausführung am Laufen halten</string>
+    <string name="permission_foreground_service_purpose">Beherbergt die Gast-JVM in einem Vordergrunddienst. Android friert einen Prozess ein, der sich bloß im Hintergrund befindet: Seine lauschenden Sockets bleiben offen, aber nichts nimmt sie an, ein JAR, das Dienste bereitstellt, würde also in dem Moment aufhören zu antworten, in dem die App verlassen wird.</string>
+    <string name="permission_foreground_service_type_label">Eine Ausführung am Laufen halten: deklarierter Typ</string>
+    <string name="permission_foreground_service_type_purpose">Der Vordergrunddienst-Typ, den eine App für diese Art von Arbeit nennen muss — ein vom Benutzer bereitgestelltes Programm auszuführen. Das Manifest deklariert ihn mit der Untertyp-Eigenschaft, die genau das aussagt.</string>
+    <string name="permission_notifications_label">Benachrichtigungen</string>
+    <string name="permission_notifications_purpose">Zeigt die laufende Benachrichtigung für eine Ausführung an: welches JAR läuft und eine Aktion Stoppen, die sie beendet, ohne die App erneut zu öffnen. Ablehnen blendet diese Benachrichtigung aus und sonst nichts — die Ausführung ist nicht betroffen.</string>
+
+    <!-- About: what the app does, how it does it, and what it is built from. -->
+    <string name="about_section_purpose">Was sie tut</string>
+    <string name="about_purpose_body">Führt ein beliebiges Java-JAR unverändert auf Android aus. Androids eigene Laufzeitumgebung ist ART, die DEX-Bytecode ausführt und kein Standard-JAR ausführen kann; diese App versucht das auch gar nicht, sondern startet eine vollständige OpenJDK-VM innerhalb der App und übergibt das JAR an diese VM.</string>
+    <string name="about_section_method">Wie sie funktioniert</string>
+    <string name="about_method_runtime">Die Gast-Laufzeitumgebung wird einmal in den eigenen Speicher der App geladen — etwa 100 MB — und dort entpackt. Binärdateien lassen sich nicht aus gemeinsamem Speicher ausführen, und die Bibliotheken des Gasts werden ohnehin über einen absoluten Pfad geladen.</string>
+    <string name="about_method_bridge">Eine kleine native Brücke macht die Bibliotheken dieser Laufzeitumgebung erreichbar und ruft daraus dlopen() für libjvm.so auf. Die VM, die hochkommt, ist unabhängig von ART: Ihre Klassen sind die eigenen der Laufzeitumgebung, unter ihrem eigenen Klassenlader.</string>
+    <string name="about_method_service">Der Gast läuft in einem eigenen Prozess (dem \":jvm\"-Prozess) als Vordergrunddienst, sodass ein JAR, das Dienste bereitstellt, nach dem Verlassen der App weiter Dienste bereitstellt und ein Fehler im Gast nur diesen Prozess mitreißt — nicht den Bildschirm.</string>
+    <string name="about_method_process">Eine JVM erlaubt eine VM pro Prozess, und ihr Herunterfahren ist hier wirkungslos, also wird der Prozess wiederverwendet: Jede Ausführung startet einen frischen, was `java -jar` bei jedem Aufruf ebenfalls tut.</string>
+    <string name="about_method_console">Alles, was das JAR ausgibt, wird in einen einzigen Strom umgeleitet und in der Konsole angezeigt, mit dem eigenen Verzeichnis der Ausführung als Arbeitsverzeichnis — innerhalb des App-Speichers, sodass nichts eine Speicherberechtigung benötigt.</string>
+    <string name="about_section_credits">Danksagungen</string>
+    <string name="about_credits_body">Die Beschaffung der Laufzeitumgebung und das Startrezept auf dem Gerät stammen von MojoLauncher: Dessen Rolling Release veröffentlicht die Laufzeitarchive, und die Android-Korrekturen, die sie starten lassen, sind die, die seine Portierungen — und PojavLauncher davor — erarbeitet haben. Der Suchpfad des Linkers, das Vorladen der Bibliothek, die Umbenennung von freetype und der Leser für die xz-Archive sind alle von ihnen.</string>
+    <string name="about_credits_runtime_body">Die Laufzeitumgebung in diesen Archiven ist OpenJDK, für Android aus dem OpenJDK-Mobile-Port gebaut. Das Repository, das sie baut, deklariert keine eigene Lizenz; die Java-Laufzeitumgebung, die es paketiert, ist die von OpenJDK.</string>
+    <string name="about_section_licences">Komponenten und Lizenzen</string>
+    <string name="about_licences_note">OpenJDK ist die Gast-Laufzeitumgebung, beim ersten Start heruntergeladen statt mitgeliefert. Der Rest des Klassenpfads ist die transitive Hülle der übrigen Zeilen — die AndroidX-Module, JSpecify und Guavas leerer ListenableFuture-Platzhalter — und steht unter Apache-2.0.</string>
+    <!-- Licence names. The identifiers stay as they are; the plain-English one does not. -->
+    <string name="licence_public_domain">Gemeinfrei</string>
+</resources>

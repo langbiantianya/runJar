@@ -13,9 +13,11 @@ import android.os.IBinder
 import android.os.Parcel
 import android.os.RemoteException
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.kxxnzstdsw.runjar.R
 import com.kxxnzstdsw.runjar.jvm.JarManifest
 import com.kxxnzstdsw.runjar.jvm.JreInstaller
 import com.kxxnzstdsw.runjar.jvm.JreRelease
@@ -41,10 +43,6 @@ private const val TAG = "RunViewModel"
 /** Main class declared by the sample JAR in `assets/hello.jar`. */
 private const val SAMPLE_MAIN_CLASS = "hello.Hello"
 
-/** Shown when a guest from an earlier session is found still running. */
-private const val ADOPTED_GUEST =
-    "A guest JVM is still running — press Stop to shut it down"
-
 /**
  * Drives one JAR run: resolve the file, read its manifest, make sure the guest
  * runtime is present, hand off to [JvmService], then stream the guest's output
@@ -53,6 +51,16 @@ private const val ADOPTED_GUEST =
 class RunViewModel(application: Application) : AndroidViewModel(application) {
 
     private val installer = JreInstaller(application)
+
+    /**
+     * A string from the app's own resources, in the device's language.
+     *
+     * Everything this class shows — the console's narration and the run's
+     * outcome — is a sentence rather than a value, so it is resolved here, at
+     * the moment it is said, from the same resources the screen reads.
+     */
+    private fun getString(@StringRes id: Int, vararg args: Any): String =
+        getApplication<Application>().getString(id, *args)
 
     private val _state = MutableStateFlow(RunUiState())
     val state: StateFlow<RunUiState> = _state.asStateFlow()
@@ -111,7 +119,13 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
             if (!ours && hostsGuest(binder)) {
                 outcomeReported = false
                 _state.update {
-                    it.copy(guestRunning = true, state = RunState.Finished(ADOPTED_GUEST, true))
+                    it.copy(
+                        guestRunning = true,
+                        state = RunState.Finished(
+                            getString(R.string.outcome_adopted_guest),
+                            success = true,
+                        ),
+                    )
                 }
             }
         }
@@ -158,7 +172,7 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
                     outcomeReported -> state.state
                     state.state is RunState.Idle -> state.state
                     else -> RunState.Finished(
-                        "The guest JVM ended — see the console",
+                        getString(R.string.outcome_guest_ended),
                         success = false,
                     )
                 }
@@ -238,7 +252,10 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
                     state = if (failed) {
                         RunState.Failed(message.ifEmpty { status })
                     } else {
-                        RunState.Finished(message.ifEmpty { "Run finished" }, success = true)
+                        RunState.Finished(
+                            message.ifEmpty { getString(R.string.outcome_run_finished) },
+                            success = true,
+                        )
                     },
                 )
             }
@@ -288,7 +305,9 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
         val name = queryDisplayName(uri) ?: "app.jar"
         val local = withContext(Dispatchers.IO) { copyToCache(uri, name) }
         if (local == null) {
-            _state.update { it.copy(state = RunState.Failed("Could not read the selected file")) }
+            _state.update {
+                it.copy(state = RunState.Failed(getString(R.string.error_read_selected_file)))
+            }
             return@launch
         }
         val mainClass = withContext(Dispatchers.IO) {
@@ -301,7 +320,7 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
                 jarName = name,
                 mainClass = mainClass.orEmpty(),
                 state = RunState.Idle,
-                console = listOf("Selected $name"),
+                console = listOf(getString(R.string.console_selected, name)),
             )
         }
     }
@@ -318,7 +337,9 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
     fun onUseSampleJar() = viewModelScope.launch {
         val file = withContext(Dispatchers.IO) { buildSampleJar() }
         if (file == null) {
-            _state.update { it.copy(state = RunState.Failed("Could not load the sample JAR")) }
+            _state.update {
+                it.copy(state = RunState.Failed(getString(R.string.error_sample_jar)))
+            }
             return@launch
         }
         localJar = file
@@ -330,7 +351,9 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
                 jarName = file.name,
                 mainClass = SAMPLE_MAIN_CLASS,
                 state = RunState.Idle,
-                console = listOf("Loaded ${file.name} with main class $SAMPLE_MAIN_CLASS"),
+                console = listOf(
+                    getString(R.string.console_sample_loaded, file.name, SAMPLE_MAIN_CLASS),
+                ),
             )
         }
     }
@@ -340,11 +363,13 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
         val release = JreRelease.byId(current.release.id) ?: JreRelease.DEFAULT
         val jar = localJar
         if (jar == null || !jar.isFile) {
-            _state.update { it.copy(state = RunState.Failed("Choose a JAR first")) }
+            _state.update { it.copy(state = RunState.Failed(getString(R.string.error_choose_jar))) }
             return
         }
         if (current.mainClass.isBlank()) {
-            _state.update { it.copy(state = RunState.Failed("Enter a main class")) }
+            _state.update {
+                it.copy(state = RunState.Failed(getString(R.string.error_main_class_required)))
+            }
             return
         }
 
@@ -368,7 +393,11 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
             home.onFailure { error ->
                 Log.e(TAG, "runtime install failed", error)
                 _state.update {
-                    it.copy(state = RunState.Failed("Runtime install failed: ${error.message}"))
+                    it.copy(
+                        state = RunState.Failed(
+                            getString(R.string.error_runtime_install, error.message.orEmpty()),
+                        ),
+                    )
                 }
                 return@launch
             }

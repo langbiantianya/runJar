@@ -28,10 +28,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.kxxnzstdsw.runjar.R
 
 /**
  * The permission guide: every permission the app declares, what it does with it,
@@ -70,7 +72,7 @@ fun PermissionGuideScreen(onDone: () -> Unit) {
     val missing = remember(revision) { RunPermissions.missing(context) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Permissions") }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.title_permissions)) }) },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -104,11 +106,11 @@ fun PermissionGuideScreen(onDone: () -> Unit) {
                         onClick = { askForMissing.launch(missing) },
                         modifier = Modifier.weight(1f),
                     ) {
-                        Text("Grant now")
+                        Text(stringResource(R.string.action_grant_now))
                     }
                 }
                 OutlinedButton(onClick = onDone, modifier = Modifier.weight(1f)) {
-                    Text("Continue")
+                    Text(stringResource(R.string.action_continue))
                 }
             }
         }
@@ -137,10 +139,7 @@ object PermissionGuide {
 @Composable
 private fun Introduction() {
     Text(
-        text = "runJar downloads a Java runtime and starts it inside this app, so the " +
-            "JAR runs under this app's permissions — a JAR's own manifest permissions " +
-            "are not merged into the APK. Everything the app declares is below, with " +
-            "what it does with it.",
+        text = stringResource(R.string.permission_guide_intro),
         style = MaterialTheme.typography.bodyMedium,
     )
 }
@@ -148,9 +147,7 @@ private fun Introduction() {
 @Composable
 private fun Closing() {
     Text(
-        text = "The two runtime permissions are asked for when a run starts. " +
-            "Declining one costs only what it is for: a JAR that never listens for " +
-            "other devices never notices the difference.",
+        text = stringResource(R.string.permission_guide_closing),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -172,7 +169,7 @@ private fun PermissionCard(permission: RunPermission, revision: Int) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = permission.label,
+                    text = stringResource(permission.labelRes),
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.weight(1f),
                 )
@@ -188,7 +185,7 @@ private fun PermissionCard(permission: RunPermission, revision: Int) {
                 fontFamily = FontFamily.Monospace,
             )
             Text(
-                text = permission.purpose,
+                text = stringResource(permission.purposeRes),
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -196,12 +193,15 @@ private fun PermissionCard(permission: RunPermission, revision: Int) {
 }
 
 /** How the platform's answer reads to the user. */
-private fun PermissionState.label(): String = when (this) {
-    PermissionState.InstallTime -> "Granted at install"
-    PermissionState.NotOnThisVersion -> "Not required on this version"
-    PermissionState.Granted -> "Granted"
-    PermissionState.Denied -> "Not granted"
-}
+@Composable
+private fun PermissionState.label(): String = stringResource(
+    when (this) {
+        PermissionState.InstallTime -> R.string.permission_state_install_time
+        PermissionState.NotOnThisVersion -> R.string.permission_state_not_on_version
+        PermissionState.Granted -> R.string.permission_state_granted
+        PermissionState.Denied -> R.string.permission_state_denied
+    },
+)
 
 @Composable
 private fun PermissionState.color() = when (this) {
