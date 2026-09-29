@@ -335,6 +335,35 @@ The native bridge is built by CMake through the NDK for all four ABIs
 (`arm64-v8a`, `armeabi-v7a`, `x86_64`, `x86`), because a 64-bit guest needs a
 64-bit host process and the app's primary ABI decides which that is.
 
+### Signing
+
+`assembleRelease` signs with the key named by `keystore.properties` in the repo
+root:
+
+```properties
+storeFile=keystore/runjar-release.jks
+storePassword=…
+keyAlias=runjar
+keyPassword=…
+```
+
+That file and the keystore are git-ignored, so a fresh clone has no key. It
+still builds: without them the release APK is signed with the debug key, which
+installs but must not be published — re-sign with the real key before shipping.
+
+To create a key of your own:
+
+```bash
+mkdir -p keystore
+keytool -genkeypair -keystore keystore/runjar-release.jks -storetype PKCS12 \
+  -alias runjar -keyalg RSA -keysize 4096 -validity 10950 \
+  -dname "CN=runJar, O=runJar, C=" 
+```
+
+`keytool` will ask for the passwords; put the same values in
+`keystore.properties`. Keep both out of version control: whoever holds them can
+sign updates to this application ID.
+
 ## Tests
 
 ```bash

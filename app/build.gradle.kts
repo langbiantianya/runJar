@@ -1,7 +1,21 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+// Release signing: `keystore.properties` at the repo root names the key and
+// carries its passwords; both it and the keystore are git-ignored. A clone
+// without the key still compiles — the release build falls back to the debug
+// key, which produces an installable but unpublishable APK rather than failing.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use(::load)
+}
+val releaseKeystore = keystoreProperties.getProperty("storeFile")
+    ?.let { rootProject.file(it) }
+    ?.takeIf { it.exists() }
 
 android {
     namespace = "com.kxxnzstdsw.runjar"
@@ -26,8 +40,21 @@ android {
         }
     }
 
+    signingConfigs {
+        releaseKeystore?.let { store ->
+            create("release") {
+                storeFile = store
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
+                ?: signingConfigs.getByName("debug")
             optimization {
                 enable = false
             }
