@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.RunJar" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      The light half of Theme.RunJar; its night half is in values-night. It is
+      this split, not anything in the app, that makes the window follow the
+      system's day/night setting: the system resolves the qualifier before the
+      first frame is drawn, so the starting window is already the right colour.
+      The Compose theme's own choice (isSystemInDarkTheme() in RunJarTheme) is
+      made later, and made the same way.
+    -->
+    <style name="Theme.RunJar" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
 </resources>

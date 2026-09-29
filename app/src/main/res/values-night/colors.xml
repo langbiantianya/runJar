@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      See values/colors.xml. The same colour for the dark side:
+      ColorDarkTokens.Background, neutral 6 of the baseline palette, which is
+      what darkColorScheme() draws when dynamic colour is unavailable.
+    -->
+    <color name="window_background">#FF141218</color>
+</resources>

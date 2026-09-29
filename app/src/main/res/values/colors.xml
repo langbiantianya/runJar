@@ -7,4 +7,17 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!--
+      The window background: what the platform paints behind the app before the
+      first Compose frame, and what the starting window is filled with at
+      launch. It is the Compose theme's own background for this mode — the
+      Material 3 light scheme's background, ColorLightTokens.Background, the
+      baseline palette's neutral 98, which is what lightColorScheme() draws when
+      dynamic colour is unavailable — so the window and the app agree on it and
+      a launch is not a flash of another colour. On API 34 and up a device whose
+      palette follows its wallpaper overrides this with the system's own
+      background; see values-v34.
+    -->
+    <color name="window_background">#FFFEF7FF</color>
 </resources>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+      The night half of Theme.RunJar: the same style name with a dark parent,
+      which the system picks instead of the light one when the device is dark.
+
+      Compose follows the system by itself — RunJarTheme takes its scheme from
+      isSystemInDarkTheme() — but Compose only draws once it is running. The
+      window on screen before that, the starting window the launcher shows while
+      the process comes up, is drawn from this theme. A light-only parent made
+      that window white in the middle of a dark device.
+    -->
+    <style name="Theme.RunJar" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+</resources>

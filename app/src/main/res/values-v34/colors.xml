@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      From API 34 the framework publishes the Material token colours the system
+      dynamic palette is made of, and the app's Compose theme is built from
+      exactly these: material3's dynamicLightColorScheme() uses
+      android.R.color.system_background_light for the background on 34 and up.
+      Taking the system's own value here rather than the fixed one means the
+      starting window and the first Compose frame are the same colour on a
+      device whose palette follows its wallpaper, so the launch is invisible
+      instead of a step between two darks (or two lights).
+
+      Below 34 the fixed colours in values/ hold; the API 31-33 dynamic scheme
+      is computed in code from palette tones, and no framework resource names
+      them.
+    -->
+    <color name="window_background">@android:color/system_background_light</color>
+</resources>

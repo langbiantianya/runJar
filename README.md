@@ -169,6 +169,31 @@ process, and on a 64-bit device Android installs the 64-bit build, but note
 that on a 32-bit-only device the guest is 32-bit too and the heap it can
 address is correspondingly smaller.
 
+## Day and night
+
+There is no appearance setting: the app follows the device, in all three of its
+windows. Two different things have to follow it for that to be true, and only
+one of them is Compose's.
+
+- **What the app draws** follows the system through the Compose theme:
+  `RunJarTheme` takes its scheme from `isSystemInDarkTheme()`, and on Android 12
+  and up from the system's dynamic palette, so the app is drawn in the device's
+  own colours — the dark ones while the device is dark.
+- **The window underneath** is the platform's, and it exists before Compose
+  does: it is what the launcher fills with the starting window while the process
+  comes up. It is a resource, so it follows the system through the night
+  qualifier — `values/themes.xml` and `values-night/themes.xml` are the light
+  and dark halves of `Theme.RunJar` — and its background is the colour the
+  Compose scheme draws for that mode: the Material 3 baseline background, or
+  from API 34 the framework's own `system_background` token, which is the very
+  colour `dynamicDarkColorScheme` puts behind the app on a device whose palette
+  follows its wallpaper.
+
+A light-only window theme is what this looked like before: the app came up dark
+on a dark device while the starting window was white, so the launch was a flash
+of the wrong colour. Everything else about a launch is unchanged, including the
+icon on the starting window, which is the launcher's.
+
 ## About and permissions
 
 The app explains itself in two screens, both reached from the run screen's top
