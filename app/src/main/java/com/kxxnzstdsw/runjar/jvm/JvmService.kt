@@ -1,0 +1,331 @@
+package com.kxxnzstdsw.runjar.jvm
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Binder
+import android.os.Build
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import android.os.Process
+import android.util.Log
+import com.kxxnzstdsw.runjar.MainActivity
+import com.kxxnzstdsw.runjar.R
+import java.io.File
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+
+private const val TAG = "JvmService"
+
+/**
+ * Hosts the guest JVM in a process of its own.
+ *
+ * Two reasons this is not the UI process: a JAR that calls `System.exit`,
+ * trips a JVM assertion or corrupts its heap takes down only this process, and
+ * a 64-bit guest heap needs a 64-bit host process, which the UI process may
+ * not be (ART picks the app's primary ABI, and 32-bit apps cannot map a 64-bit
+ * libjvm.so at all).
+ *
+ * The guest runtime is loaded once per process and reused, so a second run
+ * costs only the time `main` takes.
+ */
+class JvmService : Service() {
+
+    private val worker = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "runjar-jvm").apply { isDaemon = true }
+    }
+    private val running = AtomicBoolean(false)
+    private var installer: JreInstaller? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        installer = JreInstaller(this)
+        System.loadLibrary("runjar_jni")
+        createNotificationChannel()
+    }
+
+    /**
+     * A running JAR may be a server, and Android freezes a process that is
+     * merely backgrounded — its listening sockets stay open but nothing accepts
+     * on them, so requests hang. A foreground service is exempt from that, which
+     * is the difference between a server that keeps serving and one that only
+     * answers while the app is on screen.
+     */
+    private fun createNotificationChannel() {
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            getString(R.string.app_name),
+            NotificationManager.IMPORTANCE_LOW,
+        ).apply {
+            description = "Shown while a JAR is running"
+            setShowBadge(false)
+        }
+        getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
+    }
+
+    private fun showRunningNotification(jarName: String) {
+        val openApp = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val stop = PendingIntent.getService(
+            this,
+            1,
+            Intent(this, JvmService::class.java).setAction(JvmProtocol.CMD_STOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = Notification.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(getString(R.string.notification_running, jarName))
+            .setContentText(getString(R.string.notification_running_detail))
+            .setOngoing(true)
+            .setContentIntent(openApp)
+            .addAction(Notification.Action.Builder(null, getString(R.string.action_stop), stop).build())
+            .build()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
+    }
+
+    /**
+     * Returns a binder purely so callers can watch this process.
+     *
+     * The guest VM cannot outlive the process it lives in, and a JAR is free to
+     * end that process with `System.exit`. There is no result to return in that
+     * case, so the UI learns a run ended by observing the death of this
+     * process — see `RunViewModel`'s death recipient. The binder carries no
+     * calls of its own.
+     */
+    override fun onBind(intent: Intent?): IBinder = binder
+
+    private val binder = Binder()
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            JvmProtocol.CMD_RUN -> {
+                val release = JreRelease.byId(intent.getStringExtra(EXTRA_JRE))
+                val jarPath = intent.getStringExtra(EXTRA_JAR).orEmpty()
+                val mainClass = intent.getStringExtra(EXTRA_MAIN).orEmpty()
+                val args = intent.getStringArrayExtra(EXTRA_ARGS) ?: emptyArray()
+                val logPath = intent.getStringExtra(EXTRA_LOG).orEmpty()
+                val heapMb = intent.getIntExtra(EXTRA_HEAP_MB, DEFAULT_HEAP_MB)
+                handleRun(release, jarPath, mainClass, args, logPath, heapMb, startId)
+            }
+
+            JvmProtocol.CMD_STOP -> handleStop()
+
+            JvmProtocol.CMD_SHUTDOWN -> terminateGuestProcess()
+
+            else -> stopSelfResult(startId)
+        }
+        return START_NOT_STICKY
+    }
+
+    /**
+     * Ends the process hosting the guest VM.
+     *
+     * A JVM has state that can only be set once — `URL.setURLStreamHandlerFactory`
+     * is the one Spring Boot's embedded Tomcat trips over — so a VM that has
+     * already run something is not a clean place to run the next JAR. `java -jar`
+     * gives every invocation a fresh JVM, and so does this: the process is the
+     * unit of reuse, not the VM.
+     *
+     * Ending it is the only way to stop one, too: OpenJDK's shutdown path is a
+     * no-op on the Android port and arbitrary Java code cannot be interrupted.
+     */
+    private fun terminateGuestProcess() {
+        Log.i(TAG, "ending the guest process")
+        Handler(Looper.getMainLooper()).postDelayed({
+            Process.killProcess(Process.myPid())
+        }, BROADCAST_GRACE_MS)
+    }
+
+    /**
+     * Abandons the current run.
+     *
+     * There is no way to ask arbitrary Java code to stop: the guest is a real
+     * VM running its own threads, and OpenJDK's own shutdown path is a no-op on
+     * the Android port. The only honest stop is to end the process the VM lives
+     * in, which is why the guest has one of its own.
+     *
+     * The outcome broadcast goes out first: the UI should hear why the run
+     * ended, and it cannot do that once the process is gone.
+     */
+    private fun handleStop() {
+        if (!running.get()) {
+            Log.i(TAG, "stop requested with no run in flight")
+            return
+        }
+        notifyRunFinished(JvmProtocol.STATUS_ERROR, "Stopped")
+        terminateGuestProcess()
+    }
+
+    private fun handleRun(
+        release: JreRelease?,
+        jarPath: String,
+        mainClass: String,
+        args: Array<String>,
+        logPath: String,
+        heapMb: Int,
+        startId: Int,
+    ) {
+        if (release == null) {
+            Log.e(TAG, "run requested without a known JRE")
+            stopSelfResult(startId)
+            return
+        }
+        if (!running.compareAndSet(false, true)) {
+            Log.w(TAG, "a JAR is already running in this process")
+            stopSelfResult(startId)
+            return
+        }
+        val installer = this.installer
+        if (installer == null) {
+            Log.e(TAG, "installer not ready")
+            stopSelfResult(startId)
+            return
+        }
+        val jar = File(jarPath)
+        val log = File(logPath)
+
+        worker.execute {
+            // First, so the process is exempt from freezing for the whole run.
+            showRunningNotification(jar.name)
+            var keepAlive = false
+            try {
+                val home = installer.ensureInstalled(release)
+                Log.i(TAG, "runtime $home ready, launching $mainClass")
+
+                log.parentFile?.mkdirs()
+                val outcome = JavaRunner.bootstrap(
+                    jvmPath = installer.libJvm(release).absolutePath,
+                    javaHome = home.absolutePath,
+                    nativeLibDir = applicationInfo.nativeLibraryDir,
+                    vmArgs = buildVmArgs(home, jar, heapMb),
+                    appArgs = args,
+                    mainClass = mainClass,
+                    outPath = log.absolutePath,
+                )
+                when {
+                    outcome.startsWith(JvmProtocol.STATUS_ERROR) -> {
+                        Log.e(TAG, "run failed: $outcome")
+                        notifyRunFinished(outcome, outcome.removePrefix("${JvmProtocol.STATUS_ERROR} "))
+                        // Nothing of the JAR is running, and the VM now carries
+                        // whatever it registered; the next run gets a new one.
+                        terminateGuestProcess()
+                    }
+
+                    outcome == JvmProtocol.STATUS_STILL_RUNNING -> {
+                        Log.i(TAG, "main returned, the guest is still running")
+                        notifyRunFinished(
+                            outcome,
+                            "Main returned. The JVM is still running — press Stop to shut it down",
+                        )
+                        // It is still serving, so it stays a foreground service
+                        // and stays started: the app may be swiped away next.
+                        keepAlive = true
+                    }
+
+                    else -> {
+                        Log.i(TAG, "run completed")
+                        notifyRunFinished(JvmProtocol.STATUS_OK, "The JAR finished")
+                        terminateGuestProcess()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "run aborted: ${e.message}", e)
+                notifyRunFinished(JvmProtocol.STATUS_ERROR, e.message.orEmpty())
+                terminateGuestProcess()
+            } finally {
+                running.set(false)
+                if (!keepAlive) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelfResult(startId)
+                }
+            }
+        }
+    }
+
+    /**
+     * Tells the UI process how the run ended. The service runs in its own
+     * process, so it cannot hand a value back directly; the UI also watches the
+     * log file, and this broadcast is what lets it stop doing so.
+     */
+    private fun notifyRunFinished(status: String, message: String) {
+        sendBroadcast(
+            Intent(JvmProtocol.ACT_RUN_FINISHED)
+                .setPackage(packageName)
+                .putExtra(JvmProtocol.EXTRA_STATUS, status)
+                .putExtra(JvmProtocol.EXTRA_MESSAGE, message),
+        )
+    }
+
+    private fun buildVmArgs(home: File, jar: File, heapMb: Int): Array<String> = arrayOf(
+        "-Djava.home=${home.absolutePath}",
+        "-Djava.class.path=${JarManifest.classPathOf(jar)}",
+        "-Djava.library.path=${home.absolutePath}/lib",
+        "-Djava.io.tmpdir=${cacheDir.absolutePath}",
+        "-Duser.home=${filesDir.absolutePath}",
+        "-Dfile.encoding=UTF-8",
+        // The guest has no X11 and no window manager, so AWT must not try to
+        // reach a display even for a JAR that never opens a window.
+        "-Djava.awt.headless=true",
+        // The guest sees an Android kernel; report it as Linux, which is what
+        // Java libraries branch on (os.name=Android makes several refuse to
+        // load their native code).
+        "-Dos.name=Linux",
+        "-Dos.version=Android-${Build.VERSION.RELEASE}",
+        // POSIX_SPAWN needs jspawnhelper, which Android does not ship, so any
+        // JAR that shells out would fail to start a process without this.
+        "-Djdk.lang.Process.launchMechanism=FORK",
+        // HotSpot would otherwise size its thread pools from the host's core
+        // count, which on a phone is both wrong and unhelpful.
+        "-XX:ActiveProcessorCount=${Runtime.getRuntime().availableProcessors().coerceAtMost(4)}",
+        // -Xms reserves the whole heap up front, which a phone cannot spare for
+        // a JAR that may only print a line; start small and let it grow.
+        "-Xms16M",
+        "-Xmx${heapMb}M",
+        // Serial GC keeps the guest's footprint flat on a phone, where a
+        // parallel collector only adds threads and RSS without adding throughput.
+        "-XX:+UseSerialGC",
+    )
+
+    override fun onDestroy() {
+        worker.shutdownNow()
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val CHANNEL_ID = "runjar.guest"
+        private const val NOTIFICATION_ID = 1
+
+        const val EXTRA_JRE = "jre"
+        const val EXTRA_JAR = "jar"
+        const val EXTRA_MAIN = "main"
+        const val EXTRA_ARGS = "args"
+        const val EXTRA_LOG = "log"
+        const val EXTRA_HEAP_MB = "heapMb"
+
+        const val DEFAULT_HEAP_MB = 256
+
+        /**
+         * Delay between announcing that a run was stopped and killing the
+         * process, so the announcement reaches the UI before the sender is gone.
+         */
+        private const val BROADCAST_GRACE_MS = 300L
+    }
+}
