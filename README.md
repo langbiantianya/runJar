@@ -323,7 +323,20 @@ future versions of the GPL. Pinning it to version 3 alone is a change of those
 words and nothing else.
 
 Third-party components keep their own licences whatever this one says: the About
-screen lists them, and the guest runtime stays OpenJDK's.
+screen lists them, and the guest runtime stays OpenJDK's. Which dependencies the
+app carries, and the licence each one is under, is stated in the resources that
+screen reads: `app/src/main/res/values/strings.xml` holds the `licence_*` labels
+and the `about_*` copy that surrounds them — with one `strings.xml` per language
+beside it — while the component rows themselves are `AboutScreen.kt`'s
+`COMPONENTS` list, and the shipped coordinates are the ones
+`gradle/libs.versions.toml` and `app/build.gradle.kts` build.
+
+One of those dependencies is credited on that screen rather than listed in the
+table: the guest runtime comes from MojoLauncher's rolling
+`android-openjdk-build-17-25` release, and the same resources carry that
+reference — `about_credits_body` in `strings.xml`, the `MOJOLAUNCHER` link
+constant in `AboutScreen.kt`, and the archive URL itself in
+`JreRelease.assetUrl`.
 
 ## Building
 
