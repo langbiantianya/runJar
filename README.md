@@ -169,11 +169,44 @@ process, and on a 64-bit device Android installs the 64-bit build, but note
 that on a 32-bit-only device the guest is 32-bit too and the heap it can
 address is correspondingly smaller.
 
+## About and permissions
+
+The app explains itself in two screens, both reached from the run screen's top
+bar — and the permission guide opens by itself on the first launch, before there
+is a JAR in flight and a run that depends on the answer.
+
+- **Permissions** — every permission the app declares, what it does with it, and
+  whether the device has granted it, with a button that asks for the ones it has
+  not. The list is rendered from the same `RunPermissions` a run asks from, and a
+  unit test holds it to the manifest, so neither can drift from the other.
+- **About** — what the app is for, how a JAR comes to run on Android at all, the
+  credit for the runtime packaging and startup recipe (MojoLauncher, and
+  PojavLauncher before it), and the components the app ships or fetches with
+  their licences.
+
+Neither screen carries a close button, and neither registers a back callback:
+each is an activity of its own. Back from them is therefore a real
+cross-activity back, and the platform is what previews and performs it — the run
+screen, which is genuinely the window behind them, slides in as the swipe is
+made, and slides back if the user lets go. The app draws none of that; all it
+declares is `enableOnBackInvokedCallback`, so back is routed through the
+dispatcher rather than the legacy callback. (Being states of the run screen
+instead would have the platform preview the home screen — the run activity is
+the root of its task — while the commit stayed inside the app.)
+
 ## Permissions
 
 A JAR's own manifest permissions are **not** merged into the APK. Anything the
-JAR needs — network, storage — must be declared by the app, and requested at
-runtime on Android 6.0+.
+JAR needs — network, a listening port — must be declared by the app, and
+requested at runtime where the platform asks.
+
+The app declares five permissions: `INTERNET` (the runtime download, and every
+socket the guest opens — its traffic is the app's), `ACCESS_LOCAL_NETWORK`,
+`FOREGROUND_SERVICE` with `FOREGROUND_SERVICE_SPECIAL_USE` (the guest is hosted
+in a foreground service, or a run would stop accepting the moment the app is
+left), and `POST_NOTIFICATIONS` (the ongoing notification for a run, with its
+Stop action). Nothing else is declared: no storage, contacts, location or camera
+access.
 
 A JAR that serves other devices needs `ACCESS_LOCAL_NETWORK` on Android 17
 (API 37) and up, where the platform gates an app's local-network traffic behind
@@ -207,8 +240,9 @@ The native bridge is built by CMake through the NDK for all four ABIs
 ```
 
 Unit tests cover the tar reader against a fixture with GNU long names,
-block-spanning payloads and zero-length files, and assert the runtime archive
-carries a layer for every packaged ABI.
+block-spanning payloads and zero-length files, assert the runtime archive
+carries a layer for every packaged ABI, and pin the permission guide to the
+manifest's permission set.
 
 The extraction tests additionally verify that unpacking the real layers yields
 a startable runtime. They need the archive and skip without it:
@@ -234,7 +268,7 @@ network access:
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-Both suites pass on a real arm64 device running Android 17: 12 unit tests and
+Both suites pass on a real arm64 device running Android 17: 14 unit tests and
 6 instrumentation tests, none skipped.
 
 The bridge itself has no unit-testable surface off-device: it dlopens an

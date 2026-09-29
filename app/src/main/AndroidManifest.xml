@@ -2,8 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+      The guest runs under this app's UID, so its sockets are the app's: this
+      covers the runtime download at first use and every connection a JAR makes,
+      listening included. A JAR's own manifest permissions are not merged here.
+    -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!--
       A JAR that listens is a server, and the point of serving is that other
       devices reach it. Since Android 17 (API 37) the platform gates an app's
@@ -22,15 +26,26 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="29" />
+    <!--
+      No storage permission is declared. A picked JAR is read through the
+      document picker, which grants this app access to that one file, and a
+      run's working directory is the app's own — neither needs one. The guide
+      screen tells the user the same thing, so it has to stay true; the two are
+      kept in step by RunPermissions and its test.
+    -->
 
+    <!--
+      Predictive back is on by default from targetSdk 35 and this app targets
+      above that; it is declared all the same, because the two screens that
+      replace the window — the permission guide and About — follow the gesture
+      themselves, and this is the flag that has back routed through the
+      dispatcher they register with.
+    -->
     <application
         android:allowBackup="true"
         android:allowNativeHeapPointerTagging="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:enableOnBackInvokedCallback="true"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -50,6 +65,25 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          The two screens that explain the app are activities of their own rather
+          than another state of the run screen. Back from them is then a real
+          cross-activity back, which is the only kind the platform can preview
+          truthfully: it slides the run screen in behind them while the gesture
+          is made, instead of promising a return to the home screen and then not
+          leaving the app. Neither registers a back callback, and nothing in the
+          app draws the animation.
+        -->
+        <activity
+            android:name=".PermissionGuideActivity"
+            android:exported="false"
+            android:theme="@style/Theme.RunJar" />
+
+        <activity
+            android:name=".AboutActivity"
+            android:exported="false"
+            android:theme="@style/Theme.RunJar" />
 
         <!--
           The guest JVM lives in its own process. A JVM fault in the guest (or a

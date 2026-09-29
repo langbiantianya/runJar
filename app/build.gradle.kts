@@ -68,7 +68,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.documentfile)
     // The published JRE archives are xz-compressed tars; the platform has
     // neither xz nor tar, and MojoLauncher ships this same reader.
     implementation(libs.tukaani.xz)

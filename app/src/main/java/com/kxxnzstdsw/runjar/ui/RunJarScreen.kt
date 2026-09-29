@@ -1,12 +1,7 @@
 package com.kxxnzstdsw.runjar.ui
 
-import android.Manifest
-import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -35,6 +30,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,10 +62,18 @@ private val HEAP_CHOICES_MB = listOf(128, 256, 512, 768)
  * scrolls if it is ever given less room than it needs, and it is capped so the
  * console can never be squeezed away entirely: with the keyboard up, or on a
  * small device, the form scrolls rather than the log disappearing.
+ *
+ * [onShowPermissionGuide] and [onShowAbout] open the two screens that explain
+ * the app: what it declares, and what it is. Both are reached from here, since
+ * this is the screen the app opens on.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RunJarScreen(viewModel: RunViewModel = viewModel()) {
+fun RunJarScreen(
+    viewModel: RunViewModel = viewModel(),
+    onShowPermissionGuide: () -> Unit = {},
+    onShowAbout: () -> Unit = {},
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     val pickJar = rememberLauncherForActivityResult(
@@ -86,7 +90,15 @@ fun RunJarScreen(viewModel: RunViewModel = viewModel()) {
     ) { }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Run JAR") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Run JAR") },
+                actions = {
+                    TextButton(onClick = onShowPermissionGuide) { Text("Permissions") }
+                    TextButton(onClick = onShowAbout) { Text("About") }
+                },
+            )
+        },
     ) { padding ->
         BoxWithConstraints(
             modifier = Modifier
@@ -167,7 +179,7 @@ fun RunJarScreen(viewModel: RunViewModel = viewModel()) {
                         // whose main returned keeps running until it is stopped.
                         guestAlive = state.guestRunning,
                         onRun = {
-                            val missing = missingRunPermissions(context)
+                            val missing = RunPermissions.missing(context)
                             if (missing.isNotEmpty()) requestRunPermissions.launch(missing)
                             viewModel.run()
                         },
@@ -196,30 +208,6 @@ fun RunJarScreen(viewModel: RunViewModel = viewModel()) {
  * line pinned above it.
  */
 private val CONSOLE_FLOOR = 240.dp
-
-/**
- * The permissions a run needs that the user has not granted yet.
- *
- * `POST_NOTIFICATIONS` shows the foreground service's notification. From
- * Android 17 (API 37) the platform also gates an app's local-network traffic:
- * without `ACCESS_LOCAL_NETWORK`, connections from another device are dropped
- * while the phone's own — loopback, and its own LAN address, which the kernel
- * delivers locally — keep working, so a JAR that serves looks fine from the
- * phone and is unreachable to the rest of the network.
- */
-private fun missingRunPermissions(context: Context): Array<String> {
-    val wanted = buildList {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN) {
-            add(Manifest.permission.ACCESS_LOCAL_NETWORK)
-        }
-    }
-    return wanted
-        .filter { ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED }
-        .toTypedArray()
-}
 
 @Composable
 private fun JarSelector(jarName: String?, onPick: () -> Unit, onUseSample: () -> Unit) {
