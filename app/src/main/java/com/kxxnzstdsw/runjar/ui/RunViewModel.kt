@@ -10,6 +10,7 @@ import android.content.ServiceConnection
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
+import android.os.Parcel
 import android.os.RemoteException
 import android.util.Log
 import androidx.core.content.FileProvider
@@ -40,6 +41,10 @@ private const val TAG = "RunViewModel"
 /** Main class declared by the sample JAR in `assets/hello.jar`. */
 private const val SAMPLE_MAIN_CLASS = "hello.Hello"
 
+/** Shown when a guest from an earlier session is found still running. */
+private const val ADOPTED_GUEST =
+    "A guest JVM is still running — press Stop to shut it down"
+
 /**
  * Drives one JAR run: resolve the file, read its manifest, make sure the guest
  * runtime is present, hand off to [JvmService], then stream the guest's output
@@ -57,37 +62,57 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
 
     private var tailJob: Job? = null
     private var runReceiver: BroadcastReceiver? = null
-    private var boundBinder: IBinder? = null
 
-    /** Whether a process holding a guest VM still exists. */
-    private var guestProcessAlive = false
+    /** The service process being watched, and the death watch on it. */
+    private var boundBinder: IBinder? = null
+    private var boundDeath: IBinder.DeathRecipient? = null
 
     /**
-     * Fires when the guest's process goes away.
+     * Whether the service has already said how the current run ended.
      *
-     * A JAR may end the guest VM itself (`System.exit`), a VM fault ends it, and
-     * the app ends it deliberately before the next run. None of those produces
-     * a result, so the death of the process the VM lives in is the only signal
-     * that it is over.
+     * Until it has, the death of the guest process is the only thing that can
+     * say the run is over, so it also has to word the outcome. Once the service
+     * has reported one — "Stopped", "The JAR finished", a failure — that report
+     * stands, because the process dying is part of it: for a JAR whose `main`
+     * returned while its threads kept running, the service's report is only
+     * that it is still up, and the death is the outcome.
      */
-    private val guestDeathRecipient = IBinder.DeathRecipient {
-        onGuestProcessDied()
-    }
+    private var outcomeReported = false
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             if (binder == null) {
-                onGuestProcessDied()
+                onGuestProcessDied(boundBinder)
                 return
             }
+            // A death watch belongs to one binding: the previous run's process
+            // is retired before the next run's is created, and a watch left
+            // over from it must not be read as the current guest going away.
+            val watch = IBinder.DeathRecipient { onGuestProcessDied(binder) }
             try {
-                binder.linkToDeath(guestDeathRecipient, 0)
-                boundBinder = binder
-                // A live binding means the process holding the guest exists.
-                guestProcessAlive = true
+                binder.linkToDeath(watch, 0)
             } catch (e: RemoteException) {
                 // The process was already gone by the time we bound to it.
-                onGuestProcessDied()
+                onGuestProcessDied(boundBinder)
+                return
+            }
+            boundBinder = binder
+            boundDeath = watch
+
+            // The process is there; whether it holds a guest is for the service
+            // to say, and a guest found this way is one this instance never
+            // started. That is the app being reopened on a run whose UI process
+            // did not survive it, which is exactly when the screen would
+            // otherwise claim nothing is running — and offer nothing to stop.
+            // A run of our own is already in flight in that case, and its state
+            // is the one to keep.
+            val current = _state.value
+            val ours = current.state is RunState.Running || current.state is RunState.Preparing
+            if (!ours && hostsGuest(binder)) {
+                outcomeReported = false
+                _state.update {
+                    it.copy(guestRunning = true, state = RunState.Finished(ADOPTED_GUEST, true))
+                }
             }
         }
 
@@ -97,39 +122,82 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun onGuestProcessDied() {
-        guestProcessAlive = false
+    /** Asks the service process whether it holds a guest VM. */
+    private fun hostsGuest(binder: IBinder): Boolean {
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        return try {
+            binder.transact(JvmProtocol.TRANSACTION_HOSTS_GUEST, data, reply, 0)
+            reply.readInt() != 0
+        } catch (e: RemoteException) {
+            false
+        } finally {
+            data.recycle()
+            reply.recycle()
+        }
+    }
+
+    /**
+     * Takes note of the process [dead] was watching going away.
+     *
+     * A death only counts for the binding currently held: a binding that was
+     * released, or replaced by a later one, has nothing to say about the guest
+     * this instance is running now.
+     */
+    private fun onGuestProcessDied(dead: IBinder?) {
+        if (dead != null && boundBinder !== dead) return
         releaseServiceBinding()
-        _state.update { it.copy(guestRunning = false) }
         viewModelScope.launch {
             drainRemainingOutput()
-            if (_state.value.state is RunState.Running) {
-                _state.update {
-                    it.copy(
-                        // Deliberately neutral: the process ends either because
-                        // the JAR asked the VM to stop or because it faulted,
-                        // and the console says which.
-                        state = RunState.Finished(
-                            "The guest JVM ended — see the console",
-                            success = false,
-                        ),
+            _state.update { state ->
+                // Nothing has explained this death, so the state has to: either
+                // the run was still executing, or it had returned from `main`
+                // leaving the guest up and the guest has now gone. A state that
+                // never saw a run at all is left alone.
+                val settled = when {
+                    outcomeReported -> state.state
+                    state.state is RunState.Idle -> state.state
+                    else -> RunState.Finished(
+                        "The guest JVM ended — see the console",
+                        success = false,
                     )
                 }
+                state.copy(state = settled, guestRunning = false)
             }
         }
     }
 
     private fun releaseServiceBinding() {
         boundBinder?.let { binder ->
-            runCatching { binder.unlinkToDeath(guestDeathRecipient, 0) }
+            boundDeath?.let { watch -> runCatching { binder.unlinkToDeath(watch, 0) } }
         }
         boundBinder = null
+        boundDeath = null
         runCatching { getApplication<Application>().unbindService(serviceConnection) }
     }
 
     init {
         refreshInstalledRuntimes()
         registerRunReceiver()
+        adoptRunningGuest()
+    }
+
+    /**
+     * Picks up a guest that is still running from before this instance existed.
+     *
+     * The run outlives the UI: the guest is a foreground service in its own
+     * process, while the screen — and the process it draws in — can be ended at
+     * any time. Bound without `BIND_AUTO_CREATE`, this asks whether such a
+     * process is there at all and pays nothing when it is not; if it is, the
+     * connection reports what the service holds and the screen shows the run as
+     * running, with the Stop that ends it, instead of an idle app whose JAR is
+     * still occupying its port.
+     */
+    private fun adoptRunningGuest() {
+        val app = getApplication<Application>()
+        val intent = Intent(app, JvmService::class.java)
+        // Flags 0: ask about a service that exists, never start one.
+        runCatching { app.bindService(intent, serviceConnection, 0) }
     }
 
     /**
@@ -156,6 +224,10 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun onRunFinished(status: String, message: String) {
         val failed = status.startsWith(JvmProtocol.STATUS_ERROR)
+        // "Still running" is not an outcome: the JAR's threads are up and the
+        // service keeps its process for them, so the run is over when Stop ends
+        // it or the guest dies — and that death is what words it.
+        outcomeReported = status != JvmProtocol.STATUS_STILL_RUNNING
         tailJob?.cancel()
         // The binding is deliberately kept: while it is held the guest process
         // still exists, which is what tells the next run that its VM is stale.
@@ -278,6 +350,7 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
 
         tailJob?.cancel()
         logFile.delete()
+        outcomeReported = false
         _state.update { it.copy(console = emptyList(), state = RunState.Preparing(0f)) }
 
         val args = current.argsInput.split(' ', '\t')

@@ -30,6 +30,16 @@ object JvmProtocol {
      */
     const val STATUS_STILL_RUNNING = "OK:STILL_RUNNING"
 
+    /**
+     * Binder transaction asking [JvmService] whether the process it runs in
+     * holds a guest VM at all. Answered with an int, non-zero when it does.
+     *
+     * The guest outlives `main`, and it outlives a UI process Android has
+     * killed, so "is a JAR running?" is a question about the service process,
+     * not about anything the UI remembers having started.
+     */
+    const val TRANSACTION_HOSTS_GUEST = 1
+
     /** Machine-readable outcome, one of the `STATUS_*` values. */
     const val EXTRA_STATUS = "status"
 

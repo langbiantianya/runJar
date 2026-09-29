@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.Parcel
 import android.os.Process
 import android.util.Log
 import com.kxxnzstdsw.runjar.MainActivity
@@ -40,6 +41,19 @@ class JvmService : Service() {
         Thread(r, "runjar-jvm").apply { isDaemon = true }
     }
     private val running = AtomicBoolean(false)
+
+    /**
+     * Whether this process holds a guest VM.
+     *
+     * OpenJDK builds one VM per process and cannot undo it, so a process that
+     * has hosted a guest hosts exactly that guest for the rest of its life. The
+     * flag is therefore set as the VM is asked for and never cleared: it is
+     * what Stop acts on, because a guest that has outlived its `main` is still
+     * a guest — the process is the only thing that can end it — and what a UI
+     * that has just been restarted asks about.
+     */
+    private val guestHosted = AtomicBoolean(false)
+
     private var installer: JreInstaller? = null
 
     override fun onCreate() {
@@ -102,17 +116,28 @@ class JvmService : Service() {
     }
 
     /**
-     * Returns a binder purely so callers can watch this process.
+     * Returns a binder so callers can watch this process, and ask what is in it.
      *
      * The guest VM cannot outlive the process it lives in, and a JAR is free to
      * end that process with `System.exit`. There is no result to return in that
      * case, so the UI learns a run ended by observing the death of this
-     * process — see `RunViewModel`'s death recipient. The binder carries no
-     * calls of its own.
+     * process — see `RunViewModel`'s death recipient.
+     *
+     * Its one call answers whether the process holds a guest, which is how a UI
+     * that has been restarted — and so has forgotten the run it started — takes
+     * charge of the guest that is still serving.
      */
     override fun onBind(intent: Intent?): IBinder = binder
 
-    private val binder = Binder()
+    private val binder = object : Binder() {
+        override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
+            if (code == JvmProtocol.TRANSACTION_HOSTS_GUEST) {
+                reply?.writeInt(if (guestHosted.get()) 1 else 0)
+                return true
+            }
+            return super.onTransact(code, data, reply, flags)
+        }
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -162,15 +187,22 @@ class JvmService : Service() {
      * the Android port. The only honest stop is to end the process the VM lives
      * in, which is why the guest has one of its own.
      *
+     * That is true for as long as the guest exists, not only while its `main`
+     * is on the stack: a web application's `main` returns as soon as its server
+     * is listening, and what serves afterwards is the guest. Nothing here
+     * depends on a run being "in flight", because the process the request
+     * reaches exists to hold a guest — a request that finds none ends it
+     * anyway rather than leaving an empty process behind.
+     *
      * The outcome broadcast goes out first: the UI should hear why the run
      * ended, and it cannot do that once the process is gone.
      */
     private fun handleStop() {
-        if (!running.get()) {
-            Log.i(TAG, "stop requested with no run in flight")
-            return
+        if (guestHosted.get()) {
+            notifyRunFinished(JvmProtocol.STATUS_ERROR, "Stopped")
+        } else {
+            Log.i(TAG, "stop requested with no guest in this process")
         }
-        notifyRunFinished(JvmProtocol.STATUS_ERROR, "Stopped")
         terminateGuestProcess()
     }
 
@@ -211,6 +243,10 @@ class JvmService : Service() {
                 Log.i(TAG, "runtime $home ready, launching $mainClass")
 
                 log.parentFile?.mkdirs()
+                // From here on the process holds a VM. OpenJDK builds one per
+                // process and cannot undo it, so this is what Stop acts on and
+                // what the next UI asks about, whether or not `main` returns.
+                guestHosted.set(true)
                 val outcome = JavaRunner.bootstrap(
                     jvmPath = installer.libJvm(release).absolutePath,
                     javaHome = home.absolutePath,

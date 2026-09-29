@@ -155,7 +155,12 @@ fun RunJarScreen(viewModel: RunViewModel = viewModel()) {
 
                     RunControls(
                         canRun = state.canRun,
-                        busy = state.state is RunState.Running,
+                        // A guest that outlived its `main` is still running the
+                        // JAR: a server whose main returned keeps serving. The
+                        // label follows the guest rather than the call on the
+                        // stack, so a run that is still going is not offered as
+                        // one to start again.
+                        busy = state.state is RunState.Running || state.guestRunning,
                         // A run can be over while the guest is still up: a server
                         // whose main returned keeps running until it is stopped.
                         guestAlive = state.guestRunning,
@@ -311,8 +316,8 @@ private fun RunControls(
             enabled = canRun,
             modifier = Modifier.weight(1f),
         ) {
-            // Only the run itself, not a guest left running behind it, keeps
-            // this label busy: starting a run retires the old one.
+            // Busy for as long as the JAR is: while its `main` runs, and while a
+            // guest left behind by it still serves.
             Text(if (busy) "Running…" else "Run")
         }
         OutlinedButton(

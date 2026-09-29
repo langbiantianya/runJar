@@ -83,6 +83,15 @@ invocation API, and hands the JAR to that VM.
   running — and reports either "the JAR finished" (the process is then retired)
   or "main returned, the JVM is still running", which leaves the app serving
   until Stop is pressed.
+- **The guest, not `main`, is what the screen follows.** A JAR whose `main`
+  returned is still running, so the run button stays on "Running…" and Stop
+  stays live for as long as the guest process exists: Stop ends that process,
+  which is meaningful whether or not `main` is on the stack, and the
+  notification's Stop action does the same. The screen asks the service process
+  whether it holds a guest whenever it binds, so a UI that has been restarted —
+  Android may end the UI process while the foreground guest keeps serving — shows
+  the run as running again and offers the Stop that ends it, instead of an idle
+  app whose JAR still holds its port.
 - **A separate process, hosted as a foreground service.** `JvmService` runs in
   `:jvm`, so a JAR that ends the guest VM, trips a VM assertion or corrupts its
   heap takes down only that process and leaves the UI running. While a guest

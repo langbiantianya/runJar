@@ -35,9 +35,17 @@ data class RunUiState(
     /** Whether a guest JVM still exists for this app, whether or not it is busy. */
     val guestRunning: Boolean = false,
 ) {
+    /**
+     * Whether a new run may be started.
+     *
+     * A guest of its own blocks one: a process hosts a single VM, so the guest
+     * has to be stopped before another JAR can have this app's one JVM. That is
+     * the state the Stop button is for, and until it is used the run button is
+     * labeled for the run that is still going.
+     */
     val canRun: Boolean
-        get() = jarUri != null && mainClass.isNotBlank() && state !is RunState.Running &&
-                state !is RunState.Preparing
+        get() = jarUri != null && mainClass.isNotBlank() && !guestRunning &&
+                state !is RunState.Running && state !is RunState.Preparing
 }
 
 /** A runtime choice in the picker. */
