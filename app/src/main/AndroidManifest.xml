@@ -15,16 +15,6 @@
     -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <!--
-      A run needs a directory of its own, and it is put under Download so the
-      files a JAR writes are the user's files rather than the app's. Reaching
-      Download from a path — which is all a guest JVM can use — is what "All
-      files access" grants; without it the run falls back to the app's own
-      directory on the same volume. The UI asks for this when a run starts.
-    -->
-    <uses-permission
-        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
-        tools:ignore="ScopedStorage" />
-    <!--
       A JAR that serves requests has to keep serving after the user leaves the
       app, and Android freezes a process that is merely backgrounded. Hosting the
       guest in a foreground service is what stops that.

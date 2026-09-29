@@ -9,7 +9,6 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.Build
-import android.os.Environment
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -326,27 +325,24 @@ class JvmService : Service() {
      * anything relative to its working directory — a server its world, a
      * framework a generated file — fails there, and one that writes to `~`
      * lands somewhere the user cannot see. So each JAR gets a directory named
-     * after it under the Download folder, where the files it writes are
-     * ordinary files the user can move, edit and delete.
+     * after it inside the app's own storage, which is a real path the guest can
+     * write and which is the same from run to run, because a server's data has
+     * to survive being restarted.
      *
-     * The directory is the same from run to run, which is the point: a server's
-     * data has to survive being restarted.
-     *
-     * Writing under Download needs "All files access" — the UI asks for it when
-     * a run starts. Without it the app's own directory on the same volume is
-     * used instead: no permission is needed for it, it is the user's over USB,
-     * and a JAR still runs rather than failing for want of a directory.
+     * The external one is preferred over the internal one: both are the app's,
+     * neither needs a permission, but the external one sits on shared storage,
+     * so the files a JAR writes can also be reached over USB or `adb pull`
+     * rather than only through the app. Download itself is not used because
+     * reaching it by path needs "All files access" (`MANAGE_EXTERNAL_STORAGE`),
+     * which is a restricted permission an app that is neither a file manager
+     * nor a backup tool cannot publish with — and a JAR that serves already
+     * has its own way out: the port it listens on.
      */
     private fun runDirectory(jar: File): File {
         val name = jar.nameWithoutExtension
-        // Deprecated in favour of MediaStore, which a guest JVM cannot use: it
-        // wants a path, not a content URI.
-        @Suppress("DEPRECATION")
-        val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         val candidates = listOfNotNull(
-            File(downloads, "runJar/$name"),
-            getExternalFilesDir(null)?.let { File(it, "run/$name") },
-            File(filesDir, "run/$name"),
+            getExternalFilesDir(null)?.let { File(it, "runJar/$name") },
+            File(filesDir, "runJar/$name"),
         )
         val chosen = candidates.firstOrNull { it.isDirectory || it.mkdirs() }
         if (chosen == null) Log.w(TAG, "no usable run directory for ${jar.name}")
