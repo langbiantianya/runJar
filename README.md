@@ -418,6 +418,41 @@ keytool -genkeypair -keystore keystore/runjar-release.jks -storetype PKCS12 \
 `keystore.properties`. Keep both out of version control: whoever holds them can
 sign updates to this application ID.
 
+### Continuous integration
+
+`.github/workflows/build.yml` runs the tests, lint and both assemblies on every
+push and pull request. A pull request gets no key and stops after the debug APK;
+anything else on `main`, and a `v*` tag, also builds a signed release APK and
+attaches it to the tag's release.
+
+The key itself is not in this repository. It is held in a private one —
+`langbiantianya/keystore` — which the workflow clones over SSH, so the
+repository needs these set under *Settings → Secrets and variables → Actions*:
+
+| Name | Kind | What it is |
+| --- | --- | --- |
+| `KEYSTORE_SSH_KEY` | secret | Private key of a **deploy key** with read access to the key repository. |
+| `KEYSTORE_STORE_PASSWORD` | secret | `storePassword` for the keystore. |
+| `KEYSTORE_KEY_ALIAS` | secret | `keyAlias` for the keystore. |
+| `KEYSTORE_KEY_PASSWORD` | secret | `keyPassword` for the key. |
+| `KEYSTORE_REPO` | variable | `langbiantianya/keystore`. |
+
+`keystore.properties` is written by the workflow from those, so no password
+ever enters the repository. The deploy key is used rather than a token because
+the access is read-only and scoped to one repository; GitHub's host key is
+pinned in the workflow instead of scanned, so the clone cannot be answered by
+anything but GitHub.
+
+The release step checks its own output: a release APK signed with the debug key
+installs perfectly and looks right, and is the one mistake here that rebuilding
+cannot undo. So the certificate `apksigner` reports is compared against the one
+the fetched keystore actually holds, and the build fails if they differ.
+
+The workflow pins what the build asks for — JDK 25, NDK 28.2.13676358,
+CMake 3.22.1 and `platforms;android-37`. A platform that has not reached the
+stable SDK channel is the likely thing to need changing here, and
+`compileSdk` with it.
+
 ## Tests
 
 ```bash
