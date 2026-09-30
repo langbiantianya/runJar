@@ -83,10 +83,16 @@ class JvmService : Service() {
     }
 
     private fun showRunningNotification(jarName: String) {
+        // CLEAR_TOP so the run screen is what the notification opens, rather than
+        // a second one stacked on whatever the user had opened over it, and
+        // SINGLE_TOP so the platform resumes the one that already holds the
+        // run's console and log offset. Together with the activity's singleTask
+        // launch mode this keeps a single run screen however often it is tapped.
         val openApp = PendingIntent.getActivity(
             this,
             0,
-            Intent(this, MainActivity::class.java),
+            Intent(this, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val stop = PendingIntent.getService(

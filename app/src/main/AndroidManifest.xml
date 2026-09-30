@@ -70,10 +70,27 @@
           is what the platform does; on a tablet or a foldable the platform
           decides.
         -->
+        <!--
+          One run screen, not a stack of them. The run screen holds the state a
+          run needs — the console, the log offset, the service binding — and a
+          second instance starts out with none of it, so it shows an empty
+          console while the one underneath it keeps tailing the log and receives
+          the same outcome broadcast.
+
+          `standard` would allow exactly that: the notification's intent is
+          delivered with FLAG_ACTIVITY_NEW_TASK, which resumes this activity
+          only when it is already the top of the task. Open About — or the
+          permission guide, which opens itself on first run — and it is not the
+          top any more, so the platform has nothing to resume and starts another
+          instance on top of it, burying the one that knows what is running.
+          `singleTask` reuses the instance instead, and its ViewModel, console
+          and all, comes back with it.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:launchMode="singleTask"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.RunJar"
             android:windowSoftInputMode="adjustResize">

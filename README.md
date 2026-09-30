@@ -107,6 +107,21 @@ invocation API, and hands the JAR to that VM.
   Android may end the UI process while the foreground guest keeps serving — shows
   the run as running again and offers the Stop that ends it, instead of an idle
   app whose JAR still holds its port.
+- **There is one run screen, never a stack of them.** It holds the state a run
+  needs — the console, the log offset, the service binding — and a second
+  instance starts with none of it: an empty console, while the one underneath
+  keeps tailing the log and receives the same outcome broadcast. So the activity
+  is `singleTask`, and the notification's intent carries `CLEAR_TOP` and
+  `SINGLE_TOP`.
+
+  This is not a matter of tidiness. The notification's intent is delivered with
+  `FLAG_ACTIVITY_NEW_TASK`, which resumes the run screen only while it is the
+  top of the task. Open About — or the permission guide, which opens itself on
+  first run — and it is not the top any more, so under the default `standard`
+  mode the platform has nothing to resume and starts a *second* run screen on top
+  of it. `CLEAR_TOP` removes the screen above, and `singleTask` reuses the
+  instance, so the console and the log offset come back with it rather than
+  being rebuilt from an async service round-trip.
 - **A separate process, hosted as a foreground service.** `JvmService` runs in
   `:jvm`, so a JAR that ends the guest VM, trips a VM assertion or corrupts its
   heap takes down only that process and leaves the UI running. While a guest
