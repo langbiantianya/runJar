@@ -1,6 +1,7 @@
 package com.kxxnzstdsw.runjar.jvm
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -121,7 +122,7 @@ class JreInstaller(context: Context) {
         try {
             val status = connection.responseCode
             if (status !in 200..299) throw IOException("HTTP $status downloading $url")
-            val total = connection.contentLengthLong
+            val total = contentLengthOf(connection)
             var written = 0L
             target.outputStream().buffered().use { output ->
                 connection.inputStream.use { input ->
@@ -139,6 +140,21 @@ class JreInstaller(context: Context) {
             connection.disconnect()
         }
     }
+
+    /**
+     * The response's length in bytes, or 0 when the server does not say.
+     *
+     * The 64-bit accessor arrived in API 24. The older one returns an int, so a
+     * runtime archive above 2 GiB would come back as -1 rather than truncated —
+     * and a length is only ever used to scale the progress bar, so the honest
+     * answer for "too large to fit an int" is 0, meaning unknown.
+     */
+    private fun contentLengthOf(connection: HttpURLConnection): Long =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            connection.contentLengthLong
+        } else {
+            connection.contentLength.toLong().takeIf { it >= 0 } ?: 0L
+        }
 
     /**
      * Unpacks the universal layer, then the ABI layer, into the runtime home.

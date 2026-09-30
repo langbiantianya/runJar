@@ -71,6 +71,10 @@ class JvmService : Service() {
      * answers while the app is on screen.
      */
     private fun createNotificationChannel() {
+        // Before API 26 the channel does not exist: a notification is then
+        // identified by its ID alone and the importance below is unreachable,
+        // because the platform has nowhere to read it from.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(
             CHANNEL_ID,
             getString(R.string.app_name),
@@ -101,7 +105,14 @@ class JvmService : Service() {
             Intent(this, JvmService::class.java).setAction(JvmProtocol.CMD_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val notification = Notification.Builder(this, CHANNEL_ID)
+        // A channel is named from API 26 and the builder takes its ID; before
+        // that the single-argument builder is the only one there is.
+        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, CHANNEL_ID)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+        }
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(getString(R.string.notification_running, jarName))
             .setContentText(getString(R.string.notification_running_detail))
@@ -110,12 +121,18 @@ class JvmService : Service() {
             .addAction(Notification.Action.Builder(null, getString(R.string.action_stop), stop).build())
             .build()
 
-        // The three-argument form arrived in API 29, which is this app's floor.
-        startForeground(
-            NOTIFICATION_ID,
-            notification,
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
-        )
+        // The three-argument form arrived in API 29, and the type with it: a
+        // foreground service on API 34+ is started by type, and this one has to
+        // declare the same type its manifest does or the platform refuses it.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     /**
@@ -302,7 +319,15 @@ class JvmService : Service() {
             } finally {
                 running.set(false)
                 if (!keepAlive) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    // The constant that names the removal arrived in API 24;
+                    // before it the boolean meant the same thing and `true` is
+                    // remove rather than keep.
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        stopForeground(true)
+                    }
                     stopSelfResult(startId)
                 }
             }
