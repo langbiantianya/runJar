@@ -5,10 +5,9 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import org.tukaani.xz.XZInputStream
-import java.io.BufferedInputStream
 import java.io.File
 import java.io.IOException
+import java.io.RandomAccessFile
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.zip.ZipFile
@@ -60,8 +59,39 @@ class JreInstaller(context: Context) {
     ): File = withContext(Dispatchers.IO) {
         if (isInstalled(release)) return@withContext homeDir(release)
 
+        // One install of a given release at a time, across both processes. The
+        // UI process unpacks so the download can report progress and the service
+        // process unpacks for the run itself; left to run side by side they
+        // would share an archive file and a staging directory, and each would
+        // delete the other's half-finished work. The lock is held across the
+        // download as well, so the two cannot both fetch a few hundred megabytes.
+        rootDir().mkdirs()
+        RandomAccessFile(File(rootDir(), ".install-${release.id}.lock"), "rw").use { lockFile ->
+            val channel = lockFile.channel
+            val held = channel.lock()
+            try {
+                installLocked(release, onProgress)
+            } finally {
+                held.release()
+            }
+        }
+    }
+
+    /**
+     * Blocking install for callers already off the main thread, such as the
+     * background service that has no UI to report progress to.
+     */
+    fun ensureInstalled(release: JreRelease, onProgress: (Float) -> Unit = {}): File {
+        if (isInstalled(release)) return homeDir(release)
+        return runBlocking(Dispatchers.IO) { install(release, onProgress) }
+    }
+
+    /** The install proper, run with the per-release lock held. */
+    private fun installLocked(release: JreRelease, onProgress: (Float) -> Unit): File {
+        // Checked again: whoever held the lock may have installed it already.
+        if (isInstalled(release)) return homeDir(release)
         val archive = File(rootDir(), release.assetName)
-        try {
+        return try {
             if (!archive.isFile || archive.length() == 0L) {
                 download(release.assetUrl, archive, onProgress)
             }
@@ -80,15 +110,6 @@ class JreInstaller(context: Context) {
         } finally {
             archive.delete()
         }
-    }
-
-    /**
-     * Blocking install for callers already off the main thread, such as the
-     * background service that has no UI to report progress to.
-     */
-    fun ensureInstalled(release: JreRelease, onProgress: (Float) -> Unit = {}): File {
-        if (isInstalled(release)) return homeDir(release)
-        return runBlocking(Dispatchers.IO) { install(release, onProgress) }
     }
 
     private fun download(url: String, target: File, onProgress: (Float) -> Unit) {
@@ -154,30 +175,6 @@ class JreInstaller(context: Context) {
             return home
         } finally {
             staging.deleteRecursively()
-        }
-    }
-
-    /**
-     * Extracts an xz-compressed tar into [dest], rejecting entries that would
-     * escape it.
-     */
-    private fun untarXz(input: java.io.InputStream, dest: File) {
-        val decoded = BufferedInputStream(XZInputStream(input), 64 * 1024)
-        TarReader(decoded).use { tar ->
-            while (true) {
-                val entry = tar.nextHeader() ?: break
-                if (entry.type == TarEntry.TYPE_DIR) {
-                    File(dest, entry.name).mkdirs()
-                    continue
-                }
-                if (entry.type != TarEntry.TYPE_FILE) continue
-                val out = File(dest, entry.name)
-                if (!out.canonicalPath.startsWith(dest.canonicalPath + File.separator)) {
-                    throw IOException("archive entry escapes the runtime directory: ${entry.name}")
-                }
-                out.parentFile?.mkdirs()
-                out.outputStream().use { output -> tar.copyEntry(output, entry.size) }
-            }
         }
     }
 

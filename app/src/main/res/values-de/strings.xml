@@ -51,6 +51,7 @@
     <string name="error_main_class_required">Geben Sie eine Hauptklasse ein</string>
     <!-- %1$s is the failure's message. -->
     <string name="error_runtime_install">Installation der Laufzeitumgebung fehlgeschlagen: %1$s</string>
+    <string name="error_service_start">Der Ausführungsdienst konnte nicht gestartet werden</string>
     <string name="outcome_run_finished">Ausführung beendet</string>
     <string name="outcome_guest_ended">Die Gast-JVM wurde beendet — siehe Konsole</string>
     <string name="outcome_adopted_guest">Eine Gast-JVM läuft noch — drücken Sie Stoppen, um sie zu beenden</string>

@@ -14,6 +14,7 @@ import android.os.Parcel
 import android.os.RemoteException
 import android.util.Log
 import androidx.annotation.StringRes
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -43,6 +44,9 @@ private const val TAG = "RunViewModel"
 /** Main class declared by the sample JAR in `assets/hello.jar`. */
 private const val SAMPLE_MAIN_CLASS = "hello.Hello"
 
+/** Name used when a picked document offers no usable file name of its own. */
+private const val FALLBACK_JAR_NAME = "app.jar"
+
 /**
  * Drives one JAR run: resolve the file, read its manifest, make sure the guest
  * runtime is present, hand off to [JvmService], then stream the guest's output
@@ -67,6 +71,12 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Where the guest's System.out is redirected for the current run. */
     private val logFile: File get() = File(getApplication<Application>().cacheDir, "jre-run.log")
+
+    /** Bytes of [logFile] already shown in the console. */
+    private var logOffset = 0L
+
+    /** A line the guest has started but not finished, held until its newline. */
+    private val logPending = StringBuilder()
 
     private var tailJob: Job? = null
     private var runReceiver: BroadcastReceiver? = null
@@ -228,11 +238,11 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
         }
         val filter = IntentFilter(JvmProtocol.ACT_RUN_FINISHED)
         val app = getApplication<Application>()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            app.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            app.registerReceiver(receiver, filter)
-        }
+        // ContextCompat applies the flag on the versions that have one and drops
+        // it on the ones that do not, so the guard is its job rather than ours.
+        ContextCompat.registerReceiver(
+            app, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
         runReceiver = receiver
     }
 
@@ -262,17 +272,41 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Moves everything the guest has written since the last read into the
+     * console, and reports whether there was any of it.
+     *
+     * The tail and the final drain share one offset, so each byte reaches the
+     * console exactly once. Deduplicating by content instead would drop every
+     * repeat of a line the guest prints more than once — a progress counter
+     * saying `50%` twice is two events, not one.
+     */
+    private suspend fun pumpLog(): Boolean {
+        val chunk = withContext(Dispatchers.IO) { readNewBytes(logFile, logOffset) } ?: return false
+        logOffset += chunk.size
+        logPending.append(String(chunk, Charsets.UTF_8))
+        val lines = mutableListOf<String>()
+        while (true) {
+            val newline = logPending.indexOf("\n")
+            if (newline < 0) break
+            lines += logPending.substring(0, newline).trimEnd('\r')
+            logPending.delete(0, newline + 1)
+        }
+        if (lines.any { it.isNotBlank() }) {
+            _state.update { state -> state.copy(console = state.console + lines) }
+        }
+        return true
+    }
+
     /** Reads whatever the guest wrote after the last tail poll. */
     private suspend fun drainRemainingOutput() {
-        val text = withContext(Dispatchers.IO) {
-            if (!logFile.isFile) return@withContext null
-            logFile.readText()
-        } ?: return
-        val lines = text.split('\n').filter { it.isNotBlank() }
-        _state.update { state ->
-            val known = state.console.toSet()
-            val fresh = lines.filter { it !in known }
-            if (fresh.isEmpty()) state else state.copy(console = state.console + fresh)
+        pumpLog()
+        // A guest whose last write had no trailing newline would otherwise leave
+        // the line it wrote sitting in the buffer, unseen, for the rest of time.
+        val rest = logPending.toString().trim()
+        if (rest.isNotEmpty()) {
+            logPending.setLength(0)
+            _state.update { it.copy(console = it.console + rest) }
         }
     }
 
@@ -302,7 +336,7 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Picks a JAR and pre-fills the main class from its manifest. */
     fun onJarPicked(uri: Uri) = viewModelScope.launch {
-        val name = queryDisplayName(uri) ?: "app.jar"
+        val name = queryDisplayName(uri) ?: FALLBACK_JAR_NAME
         val local = withContext(Dispatchers.IO) { copyToCache(uri, name) }
         if (local == null) {
             _state.update {
@@ -375,6 +409,8 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
 
         tailJob?.cancel()
         logFile.delete()
+        logOffset = 0L
+        logPending.setLength(0)
         outcomeReported = false
         _state.update { it.copy(console = emptyList(), state = RunState.Preparing(0f)) }
 
@@ -423,7 +459,7 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
                 serviceConnection,
                 Context.BIND_AUTO_CREATE,
             )
-            app.startService(intent)
+            if (!startServiceOrReport(intent)) return@launch
 
             _state.update { it.copy(state = RunState.Running, guestRunning = true) }
             tailLog()
@@ -438,26 +474,8 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
      * be held back until the rest of it arrives rather than shown truncated.
      */
     private suspend fun tailLog() {
-        var consumed = 0L
-        val pending = StringBuilder()
         while (viewModelScope.isActive && _state.value.state is RunState.Running) {
-            val chunk = withContext(Dispatchers.IO) { readNewBytes(logFile, consumed) }
-            if (chunk == null) {
-                delay(120)
-                continue
-            }
-            consumed += chunk.size
-            pending.append(String(chunk, Charsets.UTF_8))
-            val lines = mutableListOf<String>()
-            while (true) {
-                val newline = pending.indexOf("\n")
-                if (newline < 0) break
-                lines += pending.substring(0, newline).trimEnd('\r')
-                pending.delete(0, newline + 1)
-            }
-            if (lines.any { it.isNotBlank() }) {
-                _state.update { state -> state.copy(console = state.console + lines) }
-            }
+            if (!pumpLog()) delay(120)
         }
     }
 
@@ -469,12 +487,20 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
         if (!file.isFile) return null
         val length = file.length()
         if (length <= from) return null
+        // Bounded, so a chatty guest cannot make every poll allocate the whole
+        // remaining log: whatever is left is picked up by the next one.
+        val wanted = minOf(length - from, MAX_LOG_READ_BYTES)
         return java.io.RandomAccessFile(file, "r").use { raf ->
             raf.seek(from)
-            val buffer = ByteArray((length - from).toInt())
-            raf.readFully(buffer)
-            buffer
-        }
+            val buffer = ByteArray(wanted.toInt())
+            var filled = 0
+            while (filled < buffer.size) {
+                val read = raf.read(buffer, filled, buffer.size - filled)
+                if (read <= 0) break
+                filled += read
+            }
+            if (filled == buffer.size) buffer else buffer.copyOf(filled)
+        }.takeIf { it.isNotEmpty() }
     }
 
     fun clearConsole() = _state.update { it.copy(console = emptyList()) }
@@ -500,7 +526,7 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
         try {
             val binder = withTimeoutOrNull(PROBE_TIMEOUT_MS) { probe.connected.await() }
             if (binder == null) return
-            app.startService(intent.setAction(JvmProtocol.CMD_SHUTDOWN))
+            startServiceQuietly(intent.setAction(JvmProtocol.CMD_SHUTDOWN))
             withTimeoutOrNull(GUEST_SHUTDOWN_TIMEOUT_MS) { probe.died.await() }
                 ?: Log.w(TAG, "the previous guest process did not end in time")
         } finally {
@@ -544,20 +570,67 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
         // Also meaningful once main has returned: a JAR that left a server
         // running is stopped the same way.
         if (current.state !is RunState.Running && !current.guestRunning) return
-        getApplication<Application>().startService(
+        startServiceOrReport(
             Intent(getApplication(), JvmService::class.java).setAction(JvmProtocol.CMD_STOP),
         )
     }
 
+    /**
+     * Starts the service, or reports to the console that the platform refused.
+     *
+     * Since API 26 an app in the background cannot start a service at all, and
+     * the platform says so by throwing. The run and the stop are both reachable
+     * from outside a foreground moment — the stop from the notification's action
+     * — so the refusal becomes something the screen can show rather than a crash
+     * of the UI process over a guest that may well be fine.
+     */
+    private fun startServiceOrReport(intent: Intent): Boolean {
+        if (startServiceQuietly(intent)) return true
+        _state.update { it.copy(state = RunState.Failed(getString(R.string.error_service_start))) }
+        return false
+    }
+
+    /**
+     * Starts the service, reporting only to the log. For the calls that are
+     * housekeeping rather than something the user asked for.
+     *
+     * @return whether the service was actually asked to start.
+     */
+    private fun startServiceQuietly(intent: Intent): Boolean = runCatching {
+        getApplication<Application>().startService(intent)
+        true
+    }.getOrElse { error ->
+        Log.w(TAG, "the ${intent.action} request was refused: ${error.message}")
+        false
+    }
+
     private suspend fun copyToCache(uri: Uri, name: String): File? = withContext(Dispatchers.IO) {
+        val safeName = safeFileName(name)
         runCatching {
-            val target = File(getApplication<Application>().filesDir, "user-jars/$name")
+            val target = File(File(getApplication<Application>().filesDir, "user-jars"), safeName)
             target.parentFile?.mkdirs()
             getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
                 target.outputStream().use { output -> input.copyTo(output) }
             } ?: return@runCatching null
             target
         }.getOrNull()
+    }
+
+    /**
+     * The name to store a picked file under, reduced to a plain file name.
+     *
+     * The display name comes from whichever app served the document, so it is
+     * chosen by someone else and can carry `../` or a separator. Folding it into
+     * a path unchecked would let a document provider write outside the app's own
+     * `user-jars` directory, so everything that is not part of a file name goes.
+     */
+    private fun safeFileName(name: String): String {
+        val leaf = name.substringAfterLast('/').substringAfterLast('\\')
+        val cleaned = leaf.map { if (it.isLetterOrDigit() || it == '.' || it == '-' || it == '_') it else '_' }
+            .joinToString("")
+            .trim('.', '_')
+        // `.` and `..` both reduce to nothing once the leading dots are trimmed.
+        return cleaned.ifEmpty { FALLBACK_JAR_NAME }
     }
 
     private fun queryDisplayName(uri: Uri): String? {
@@ -591,6 +664,9 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
 
         /** How long to wait for the probe to report whether a guest process exists. */
         private const val PROBE_TIMEOUT_MS = 2_000L
+
+        /** How much of the log one poll reads, so a large file is read in pieces. */
+        private const val MAX_LOG_READ_BYTES = 256L * 1024L
 
         /** Only the runtimes this device can actually run. */
         val RELEASE_OPTIONS: List<JreReleaseOption> =

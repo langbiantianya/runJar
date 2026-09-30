@@ -50,6 +50,7 @@
     <string name="error_main_class_required">Введите главный класс</string>
     <!-- %1$s is the failure's message. -->
     <string name="error_runtime_install">Не удалось установить среду выполнения: %1$s</string>
+    <string name="error_service_start">Не удалось запустить службу выполнения</string>
     <string name="outcome_run_finished">Запуск завершён</string>
     <string name="outcome_guest_ended">Гостевая JVM завершилась — см. консоль</string>
     <string name="outcome_adopted_guest">Гостевая JVM всё ещё выполняется — нажмите «Остановить», чтобы её завершить</string>

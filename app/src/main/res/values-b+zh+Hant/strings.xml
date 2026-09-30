@@ -48,6 +48,7 @@
     <string name="error_main_class_required">請輸入主類別</string>
     <!-- %1$s is the failure's message. -->
     <string name="error_runtime_install">執行階段安裝失敗：%1$s</string>
+    <string name="error_service_start">無法啟動執行服務</string>
     <string name="outcome_run_finished">執行完成</string>
     <string name="outcome_guest_ended">客體 JVM 已結束 — 請見主控台</string>
     <string name="outcome_adopted_guest">客體 JVM 仍在執行 — 按下「停止」將它關閉</string>

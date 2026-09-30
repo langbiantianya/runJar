@@ -51,6 +51,7 @@
     <string name="error_main_class_required">Enter a main class</string>
     <!-- %1$s is the failure's message. -->
     <string name="error_runtime_install">Runtime install failed: %1$s</string>
+    <string name="error_service_start">Could not start the run service</string>
     <string name="outcome_run_finished">Run finished</string>
     <string name="outcome_guest_ended">The guest JVM ended — see the console</string>
     <string name="outcome_adopted_guest">A guest JVM is still running — press Stop to shut it down</string>

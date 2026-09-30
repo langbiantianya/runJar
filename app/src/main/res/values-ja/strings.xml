@@ -50,6 +50,7 @@
     <string name="error_main_class_required">メインクラスを入力してください</string>
     <!-- %1$s is the failure's message. -->
     <string name="error_runtime_install">ランタイムのインストールに失敗しました: %1$s</string>
+    <string name="error_service_start">実行サービスを開始できませんでした</string>
     <string name="outcome_run_finished">実行が完了しました</string>
     <string name="outcome_guest_ended">ゲスト JVM が終了しました — コンソールを確認してください</string>
     <string name="outcome_adopted_guest">ゲスト JVM はまだ実行中です — 停止を押して終了させてください</string>

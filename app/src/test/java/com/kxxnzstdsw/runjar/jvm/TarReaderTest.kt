@@ -5,10 +5,16 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.tukaani.xz.LZMA2Options
 import org.tukaani.xz.XZInputStream
+import org.tukaani.xz.XZOutputStream
 import java.io.BufferedInputStream
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
+import java.io.InputStream
+import java.nio.file.Files
 import java.util.zip.ZipFile
 
 /**
@@ -107,16 +113,106 @@ class TarReaderTest {
     }
 
     @Test
-    fun `refuses an archive entry that would escape the destination`() {
-        // The guard lives in the installer; assert the invariant it protects by
-        // checking that a traversing name would be caught by the canonical-path
-        // comparison the installer applies.
-        val dest = File("/data/data/com.kxxnzstdsw.runjar/files/jre/.staging-jre21")
-        val escaping = File(dest, "../../../databases/app.db")
-        assertFalse(
-            "traversing entry must not resolve inside the destination",
-            escaping.canonicalPath.startsWith(dest.canonicalPath + File.separator),
+    fun `an ordinary tree still extracts`() {
+        val dest = freshDir()
+        untarXz(
+            tarXzOf(
+                TarEntrySpec("bin", TarEntry.TYPE_DIR),
+                TarEntrySpec("bin/java", TarEntry.TYPE_FILE, "ok".toByteArray()),
+            ),
+            dest,
         )
+        assertEquals("ok", File(dest, "bin/java").readText())
+    }
+
+    @Test
+    fun `refuses a file entry that would escape the destination`() {
+        val dest = freshDir()
+        val error = runCatching {
+            untarXz(tarXzOf(TarEntrySpec("../../escaped.txt", TarEntry.TYPE_FILE, "x".toByteArray())), dest)
+        }.exceptionOrNull()
+        assertTrue("a traversing file entry must be rejected, got $error", error is IOException)
+        assertFalse("nothing may be written outside the destination", File(dest.parentFile, "escaped.txt").exists())
+    }
+
+    @Test
+    fun `refuses a directory entry that would escape the destination`() {
+        val dest = freshDir()
+        // The payload is never written, so a guard that only wrapped the file
+        // branch would let this through and create the directory regardless.
+        val error = runCatching {
+            untarXz(tarXzOf(TarEntrySpec("../../escaped", TarEntry.TYPE_DIR)), dest)
+        }.exceptionOrNull()
+        assertTrue("a traversing directory entry must be rejected, got $error", error is IOException)
+        assertFalse("nothing may be created outside the destination", File(dest.parentFile, "escaped").exists())
+    }
+
+    private fun freshDir(): File {
+        val dir = Files.createTempDirectory("untarxz").toFile()
+        dir.deleteOnExit()
+        return dir
+    }
+
+    /** One entry to put in a hand-built archive. */
+    private class TarEntrySpec(
+        val name: String,
+        val type: Byte,
+        val body: ByteArray = ByteArray(0),
+    )
+
+    /**
+     * A minimal ustar archive holding [entries], xz-compressed.
+     *
+     * Written by hand because the entries worth testing are ones no `tar` on a
+     * normal filesystem will produce: a name that traverses out of the archive
+     * root is exactly what the extractor has to refuse, and `tar` refuses to
+     * write it in the first place.
+     */
+    private fun tarXzOf(vararg entries: TarEntrySpec): InputStream {
+        val tar = ByteArrayOutputStream()
+        for (entry in entries) {
+            val header = ByteArray(TAR_BLOCK_SIZE)
+            entry.name.toByteArray().copyInto(header, 0)
+            writeOctal(header, 100, 8, 0)                       // mode
+            writeOctal(header, 108, 8, 0)                       // uid
+            writeOctal(header, 116, 8, 0)                       // gid
+            writeOctal(header, 124, 12, entry.body.size)       // size
+            writeOctal(header, 136, 12, 0)                      // mtime
+            header[156] = entry.type
+            // The ustar magic, spelled as bytes so the source holds no NUL itself.
+            put(header, 257, 0x75, 0x73, 0x74, 0x61, 0x72, 0x00)
+            put(header, 263, 0x30, 0x30)                       // version "00"
+            // The checksum is computed with its own field read as spaces.
+            for (i in 148 until 156) header[i] = ' '.code.toByte()
+            var sum = 0
+            for (b in header) sum += b.toInt() and 0xFF
+            writeOctal(header, 148, 7, sum)
+            header[155] = 0
+            tar.write(header)
+            tar.write(entry.body)
+            val padding = (TAR_BLOCK_SIZE - (entry.body.size % TAR_BLOCK_SIZE)) % TAR_BLOCK_SIZE
+            repeat(padding) { tar.write(0) }
+        }
+        repeat(TAR_BLOCK_SIZE * 2) { tar.write(0) }
+        // Still xz-compressed: untarXz is what does the decoding.
+        return ByteArrayInputStream(xz(tar.toByteArray()))
+    }
+
+    /** Writes the given bytes into [header] starting at [offset]. */
+    private fun put(header: ByteArray, offset: Int, vararg bytes: Int) {
+        bytes.forEachIndexed { i, value -> header[offset + i] = value.toByte() }
+    }
+
+    private fun xz(bytes: ByteArray): ByteArray = ByteArrayOutputStream().use { out ->
+        XZOutputStream(out, LZMA2Options()).use { it.write(bytes) }
+        out.toByteArray()
+    }
+
+    /** A NUL-terminated octal field, as a ustar header spells a number. */
+    private fun writeOctal(header: ByteArray, offset: Int, length: Int, value: Int) {
+        val text = value.toString(8).padStart(length - 1, '0').toByteArray()
+        text.copyInto(header, offset)
+        header[offset + length - 1] = 0
     }
 }
 

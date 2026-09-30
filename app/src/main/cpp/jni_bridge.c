@@ -348,8 +348,9 @@ static JavaVM *create_vm(JNIEnv *env, jstring jvm_path, const char *java_home,
     jint status = create(&vm, &vm_env, &init_args);
 
     // Only the caller's options are heap allocated; the two hook slots are
-    // string literals.
-    for (jsize i = 0; i < arg_count; i++) free((void *) options[i].optionString);
+    // string literals, so the bound is the two fewer than `copied`. Freeing by
+    // `copied` would hand `free()` a pointer into the binary's rodata.
+    for (jsize i = 0; i + 2 < copied; i++) free((void *) options[i].optionString);
     free(options);
 
     if (status != JNI_OK || vm == NULL) {

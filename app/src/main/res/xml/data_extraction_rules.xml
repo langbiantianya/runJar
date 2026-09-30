@@ -1,19 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+  The unpacked runtimes are excluded from both. They are a few hundred megabytes
+  of build output that `JreInstaller` re-downloads on demand, so backing them up
+  costs the user their backup quota and buys a copy that may not even match the
+  release the app has since moved to. Everything the user actually produced —
+  the JARs they picked — is left in.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="file" path="jre/" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="file" path="jre/" />
     </device-transfer>
-    -->
 </data-extraction-rules>

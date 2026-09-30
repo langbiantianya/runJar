@@ -50,6 +50,7 @@
     <string name="error_main_class_required">请输入主类</string>
     <!-- %1$s is the failure's message. -->
     <string name="error_runtime_install">运行时安装失败：%1$s</string>
+    <string name="error_service_start">无法启动运行服务</string>
     <string name="outcome_run_finished">运行结束</string>
     <string name="outcome_guest_ended">来宾 JVM 已结束 — 请查看控制台</string>
     <string name="outcome_adopted_guest">仍有来宾 JVM 在运行 — 按停止可将其关闭</string>

@@ -36,6 +36,21 @@ invocation API, and hands the JAR to that VM.
    29) binaries in shared storage cannot be executed, and the guest's
    libraries are loaded by absolute path regardless.
 
+   One install of a given release runs at a time, across both processes. The UI
+   process unpacks so the download can report progress and the service process
+   unpacks for the run itself; left to run side by side they would share an
+   archive file and a staging directory, and each would delete the other's
+   half-finished work. A per-release `FileLock` serialises them, and the
+   installed-runtime check is repeated once the lock is held.
+
+   Entry names in those archives are the archive's to choose, so every entry is
+   resolved against the destination on its canonical path before anything is
+   created — directory entries as much as files, since `mkdirs` on a traversing
+   name creates directories outside the destination before a single file is
+   written. The check lives in `ArchiveExtractor.kt` rather than in
+   `JreInstaller`, which keeps the one security-relevant decision in unpacking
+   testable without an Android `Context`.
+
 2. **Loading the VM** — the JNI bridge in `src/main/cpp` makes the runtime's
    libraries reachable, then `dlopen`s `libjvm.so` from it.
 
@@ -142,6 +157,17 @@ invocation API, and hands the JAR to that VM.
   that is neither a file manager nor a backup tool cannot hold. When external
   storage is unavailable the internal directory is used instead, and the run
   behaves the same way.
+- **A picked file's display name is not trusted as a path.** It comes from
+  whichever app served the document, so it is chosen by someone else and can
+  carry `../` or a separator. It is reduced to a plain file name — last segment
+  only, everything outside `[A-Za-z0-9._-]` replaced, leading dots and
+  underscores trimmed — before it is joined to `files/user-jars`, so a document
+  provider cannot write outside the app's own directory. A name that reduces to
+  nothing falls back to `app.jar`.
+- **The unpacked runtime is excluded from backup.** `jre/` is a few hundred
+  megabytes of build output that the app re-downloads on demand, so backing it
+  up would spend the user's backup quota on a copy that may not match the
+  release the app has since moved to. The JARs the user picked are left in.
 - **`libfreetype.so.6` is renamed to `libfreetype.so`** after unpacking,
   because the guest's libraries reference the unversioned name.
 - **`-Djdk.lang.Process.launchMechanism=FORK`** because `POSIX_SPAWN` needs
@@ -389,6 +415,16 @@ carries a layer for every packaged ABI, pin the permission guide to the
 manifest's permission set, and hold every language to the default resources'
 key set and format arguments.
 
+Unpacking is tested against archives built in memory rather than checked in,
+because the entries worth testing are ones no `tar` will emit: a name that
+traverses out of the archive root is exactly what the extractor has to refuse,
+and `tar` refuses to write it. A hand-written ustar header per entry is
+therefore the only way to feed one, and it is what lets a file entry and a
+directory entry that both escape be asserted separately — a guard written only
+around the branch that writes bytes passes the first and fails the second. The
+same tests drive a well-formed tree through to completion, so the guard cannot
+pass by refusing everything.
+
 The extraction tests additionally verify that unpacking the real layers yields
 a startable runtime. They need the archive and skip without it:
 
@@ -413,8 +449,9 @@ network access:
 ./gradlew :app:connectedDebugAndroidTest
 ```
 
-Both suites pass on a real arm64 device running Android 17: 14 unit tests and
-6 instrumentation tests, none skipped.
+Both suites pass on a real arm64 device running Android 17: 6 instrumentation
+tests, none skipped, and 19 unit tests of which the 4 that unpack the published
+runtime need the fixtures above and skip without them.
 
 The sample JAR the app ships as `assets/hello.jar` — and that both instrumentation
 tests run — is built from the sources in `sample/hello/`. `Hello` prints what the
@@ -432,4 +469,10 @@ classes record — and `LICENSE` covers them as it covers everything else here.
 The bridge itself has no unit-testable surface off-device: it dlopens an
 Android-built `libjvm.so`, which links against Bionic and cannot load on a
 desktop libc. Anything that changes `src/main/cpp` needs the instrumentation
-test to be meaningful.
+test to be meaningful — read it as a requirement rather than a nicety. A loop
+there once freed the `exit` and `abort` option strings, which are literals in
+the binary rather than heap, and the result was a guest that never came up:
+compiling cleanly, passing every unit test, and only visible as an abort after
+`JNI_CreateJavaVM` had already returned. There is no way to assert this from a
+desktop test, so the only thing standing between a change to that file and a
+broken run is actually running the app.
