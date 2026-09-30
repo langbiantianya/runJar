@@ -17,6 +17,7 @@ import androidx.annotation.StringRes
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.kxxnzstdsw.runjar.R
 import com.kxxnzstdsw.runjar.jvm.JarManifest
@@ -52,7 +53,12 @@ private const val FALLBACK_JAR_NAME = "app.jar"
  * runtime is present, hand off to [JvmService], then stream the guest's output
  * into the console.
  */
-class RunViewModel(application: Application) : AndroidViewModel(application) {
+class RunViewModel(
+    application: Application,
+    // Survives the UI process being ended and the screen rebuilt, which is the
+    // normal way this app is left in the background for long enough.
+    private val savedState: SavedStateHandle,
+) : AndroidViewModel(application) {
 
     private val installer = JreInstaller(application)
 
@@ -137,6 +143,11 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
                         ),
                     )
                 }
+                // The log is still on disk and this instance has read none of
+                // it — the offset only moves when a tail reads. Without this the
+                // screen adopts the guest and then shows an empty console
+                // beside it, which reads as the JAR having printed nothing.
+                viewModelScope.launch { drainRemainingOutput() }
             }
         }
 
@@ -201,9 +212,47 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        restoreLastRun()
         refreshInstalledRuntimes()
         registerRunReceiver()
         adoptRunningGuest()
+    }
+
+    /**
+     * Re-seeds the form from the run this screen was last showing.
+     *
+     * The run outlives the UI process, so a screen that comes back to a live
+     * guest has to be able to say which JAR that guest is running. Restored by
+     * the path of the copy the app made of it, which is in its own storage and
+     * so is still there; a path that no longer resolves is dropped rather than
+     * offered as something to run.
+     */
+    private fun restoreLastRun() {
+        val path = savedState.get<String>(KEY_JAR_PATH) ?: return
+        val jar = File(path)
+        if (!jar.isFile) return
+        localJar = jar
+        _state.update {
+            it.copy(
+                jarUri = Uri.fromFile(jar),
+                jarName = savedState.get<String>(KEY_JAR_NAME) ?: jar.name,
+                mainClass = savedState.get<String>(KEY_MAIN_CLASS).orEmpty(),
+                argsInput = savedState.get<String>(KEY_ARGS).orEmpty(),
+                heapMb = savedState.get<Int>(KEY_HEAP_MB) ?: it.heapMb,
+                release = JreRelease.byId(savedState.get<String>(KEY_RELEASE))
+                    ?.let(JreReleaseOption::of) ?: it.release,
+            )
+        }
+    }
+
+    /** Records the run this screen is set up to start, so it survives a restart. */
+    private fun rememberSelection(state: RunUiState) {
+        savedState[KEY_JAR_PATH] = localJar?.absolutePath
+        savedState[KEY_JAR_NAME] = state.jarName
+        savedState[KEY_MAIN_CLASS] = state.mainClass
+        savedState[KEY_ARGS] = state.argsInput
+        savedState[KEY_HEAP_MB] = state.heapMb
+        savedState[KEY_RELEASE] = state.release.id
     }
 
     /**
@@ -357,15 +406,28 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
                 console = listOf(getString(R.string.console_selected, name)),
             )
         }
+        rememberSelection(_state.value)
     }
 
-    fun onMainClassChange(value: String) = _state.update { it.copy(mainClass = value) }
+    fun onMainClassChange(value: String) = updatePersisting { it.copy(mainClass = value) }
 
-    fun onArgsChange(value: String) = _state.update { it.copy(argsInput = value) }
+    fun onArgsChange(value: String) = updatePersisting { it.copy(argsInput = value) }
 
-    fun onHeapChange(value: Int) = _state.update { it.copy(heapMb = value.coerceIn(64, 1024)) }
+    fun onHeapChange(value: Int) = updatePersisting { it.copy(heapMb = value.coerceIn(64, 1024)) }
 
-    fun onReleaseChange(option: JreReleaseOption) = _state.update { it.copy(release = option) }
+    fun onReleaseChange(option: JreReleaseOption) = updatePersisting { it.copy(release = option) }
+
+    /**
+     * Applies a change to the run being set up, and records it.
+     *
+     * Everything the form holds describes a run, and the screen is routinely
+     * destroyed and rebuilt while the run it describes goes on in a process of
+     * its own, so each edit is saved rather than only the act of starting one.
+     */
+    private fun updatePersisting(transform: (RunUiState) -> RunUiState) {
+        _state.update(transform)
+        rememberSelection(_state.value)
+    }
 
     /** Materialises a trivial JAR in app storage, for verifying the pipeline. */
     fun onUseSampleJar() = viewModelScope.launch {
@@ -390,6 +452,7 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
                 ),
             )
         }
+        rememberSelection(_state.value)
     }
 
     fun run() {
@@ -667,6 +730,22 @@ class RunViewModel(application: Application) : AndroidViewModel(application) {
 
         /** How much of the log one poll reads, so a large file is read in pieces. */
         private const val MAX_LOG_READ_BYTES = 256L * 1024L
+
+        /**
+         * What the run screen was last set up to start.
+         *
+         * Held in saved state rather than only in memory because the screen is
+         * routinely destroyed while the run it describes goes on in the service
+         * process: Android ends the UI process whenever it likes, and a
+         * recreated screen that has forgotten which JAR is serving would claim
+         * none is chosen and offer nothing to stop.
+         */
+        private const val KEY_JAR_PATH = "jarPath"
+        private const val KEY_JAR_NAME = "jarName"
+        private const val KEY_MAIN_CLASS = "mainClass"
+        private const val KEY_ARGS = "args"
+        private const val KEY_HEAP_MB = "heapMb"
+        private const val KEY_RELEASE = "release"
 
         /** Only the runtimes this device can actually run. */
         val RELEASE_OPTIONS: List<JreReleaseOption> =
